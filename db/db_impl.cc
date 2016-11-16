@@ -32,7 +32,9 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
-
+unsigned long long totalBytesWrite;
+unsigned long long totalWriteCount;
+unsigned long long immetableWrites;
 namespace leveldb {
 
 const int kNumNonTableCacheFiles = 10;
@@ -136,7 +138,9 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       bg_compaction_scheduled_(false),
       manual_compaction_(NULL) {
   has_imm_.Release_Store(NULL);
-
+  totalBytesWrite = 0;
+  totalWriteCount = 0;
+  immetableWrites = 0;
   // Reserve ten files or so for other uses and give the rest to TableCache.
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
   table_cache_ = new TableCache(dbname_, &options_, table_cache_size);
@@ -165,7 +169,9 @@ DBImpl::~DBImpl() {
   delete log_;
   delete logfile_;
   delete table_cache_;
-
+  printf("totalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
+   printf("totalBytesWrite:%.2lfMB  totalWriteCount:%llu immetableWrite:%.2lfMB \n",totalBytesWrite*1.0/1024/1024,totalWriteCount,immetableWrites*1.0/1024/1024);
+  
   if (owns_info_log_) {
     delete options_.info_log;
   }
@@ -527,6 +533,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   CompactionStats stats;
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
+  immetableWrites += meta.file_size;
   stats_[level].Add(stats);
   return s;
 }
