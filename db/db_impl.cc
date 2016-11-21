@@ -3,7 +3,8 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "db/db_impl.h"
-
+#include<sys/time.h>
+#include<unistd.h>
 #include <algorithm>
 #include <set>
 #include <string>
@@ -35,6 +36,16 @@
 unsigned long long totalBytesWrite;
 unsigned long long totalWriteCount;
 unsigned long long immetableWrites;
+unsigned long long wait_count;
+
+enum TIME_STATISTICS{
+  MEM_TIME,
+  LOG_TIME,
+  WAIT_TIME,
+  TIME_LENGTH
+};
+unsigned long long timeSums[TIME_LENGTH];
+static const char timeString[][50]={"MEM_TIME_PERCENT","LOG_TIME_PERCENT","WAIT_TIME_PERCENT"};
 namespace leveldb {
 
 const int kNumNonTableCacheFiles = 10;
@@ -141,6 +152,11 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   totalBytesWrite = 0;
   totalWriteCount = 0;
   immetableWrites = 0;
+  wait_count = 0;
+
+  for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
+    timeSums[i] = 0;
+  }
   // Reserve ten files or so for other uses and give the rest to TableCache.
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
   table_cache_ = new TableCache(dbname_, &options_, table_cache_size);
@@ -153,6 +169,7 @@ DBImpl::~DBImpl() {
   // Wait for background work to finish
   mutex_.Lock();
   shutting_down_.Release_Store(this);  // Any non-NULL value is ok
+  unsigned long long timeSum = 0;
   while (bg_compaction_scheduled_) {
     bg_cv_.Wait();
   }
@@ -172,6 +189,17 @@ DBImpl::~DBImpl() {
   printf("totalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
    printf("totalBytesWrite:%.2lfMB  totalWriteCount:%llu immetableWrite:%.2lfMB \n",totalBytesWrite*1.0/1024/1024,totalWriteCount,immetableWrites*1.0/1024/1024);
   
+   for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
+    printf("%s:%llu\t",timeString[i],timeSums[i]);
+    timeSum += timeSums[i];
+  }
+  printf("\n");
+  for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
+    printf("%s:%.2lf%%\t",timeString[i],timeSums[i]*1.0/timeSum*100);
+  }
+  printf("\n");
+  printf("wait count:%llu\n",wait_count);
+ 
   if (owns_info_log_) {
     delete options_.info_log;
   }
@@ -1198,12 +1226,22 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return DB::Delete(options, key);
 }
 
+void timeAddTo(struct timeval &begin_time,unsigned long long &timeSum){
+  struct timeval end_time,res;
+  static const unsigned int sToUs = 1000000;
+  gettimeofday(&end_time,NULL);
+  timersub(&end_time,&begin_time,&res);
+  timeSum = timeSum + res.tv_sec * sToUs + res.tv_usec;
+  
+}
 Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
   Writer w(&mutex_);
   w.batch = my_batch;
   w.sync = options.sync;
   w.done = false;
-
+  struct timeval begin_time;
+  struct timeval end_time;
+  struct timeval res;
   MutexLock l(&mutex_);
   writers_.push_back(&w);
   while (!w.done && &w != writers_.front()) {
@@ -1214,7 +1252,9 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
   }
 
   // May temporarily unlock and wait.
+  gettimeofday(&begin_time,NULL);
   Status status = MakeRoomForWrite(my_batch == NULL);
+  timeAddTo(begin_time,timeSums[WAIT_TIME]);
   uint64_t last_sequence = versions_->LastSequence();
   Writer* last_writer = &w;
   if (status.ok() && my_batch != NULL) {  // NULL batch is for compactions
@@ -1228,17 +1268,27 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
     // into mem_.
     {
       mutex_.Unlock();
-      status = log_->AddRecord(WriteBatchInternal::Contents(updates));
+      gettimeofday(&begin_time,NULL);
       bool sync_error = false;
-      if (status.ok() && options.sync) {
-        status = logfile_->Sync();
+      if(options_.log_open){
+	status = log_->AddRecord(WriteBatchInternal::Contents(updates));
+	
+	if (status.ok() && options.sync) {
+	  status = logfile_->Sync();
         if (!status.ok()) {
-          sync_error = true;
-        }
+	    sync_error = true;
+	  }
+	}
+      }else{
+	status = Status::OK();
       }
+     
+     timeAddTo(begin_time,timeSums[LOG_TIME]);
+     gettimeofday(&begin_time,NULL);
       if (status.ok()) {
         status = WriteBatchInternal::InsertInto(updates, mem_);
       }
+      timeAddTo(begin_time,timeSums[MEM_TIME]);
       mutex_.Lock();
       if (sync_error) {
         // The state of the log file is indeterminate: the log record we
@@ -1327,6 +1377,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
   assert(!writers_.empty());
   bool allow_delay = !force;
   Status s;
+  struct timeval start_time,end_time,res;
   while (true) {
     if (!bg_error_.ok()) {
       // Yield previous error
@@ -1345,6 +1396,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       env_->SleepForMicroseconds(1000);
       allow_delay = false;  // Do not delay a single write more than once
       mutex_.Lock();
+      wait_count++;
     } else if (!force &&
                (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {
       // There is room in current memtable
@@ -1354,26 +1406,33 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
       bg_cv_.Wait();
+      wait_count++;
     } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) {
       // There are too many level-0 files.
       Log(options_.info_log, "Too many L0 files; waiting...\n");
       bg_cv_.Wait();
+      wait_count++;
     } else {
       // Attempt to switch to a new memtable and trigger compaction of old
       assert(versions_->PrevLogNumber() == 0);
-      uint64_t new_log_number = versions_->NewFileNumber();
-      WritableFile* lfile = NULL;
-      s = env_->NewWritableFile(LogFileName(dbname_, new_log_number), &lfile);
-      if (!s.ok()) {
+      if(options_.log_open){
+
+	uint64_t new_log_number = versions_->NewFileNumber();
+	WritableFile* lfile = NULL;
+	s = env_->NewWritableFile(LogFileName(dbname_, new_log_number), &lfile);
+	if (!s.ok()) {
         // Avoid chewing through file number space in a tight loop.
-        versions_->ReuseFileNumber(new_log_number);
-        break;
+	  versions_->ReuseFileNumber(new_log_number);
+	  break;
+	}
+	delete log_;
+	delete logfile_;
+	logfile_ = lfile;
+	logfile_number_ = new_log_number;
+	log_ = new log::Writer(lfile);
+
+	
       }
-      delete log_;
-      delete logfile_;
-      logfile_ = lfile;
-      logfile_number_ = new_log_number;
-      log_ = new log::Writer(lfile);
       imm_ = mem_;
       has_imm_.Release_Store(imm_);
       mem_ = new MemTable(internal_comparator_);

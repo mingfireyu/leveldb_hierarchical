@@ -114,6 +114,7 @@ static bool FLAGS_reuse_logs = false;
 // Use the db with the following name.
 static const char* FLAGS_db = NULL;
 
+static bool FLAGS_log_open = true;
 namespace leveldb {
 
 namespace {
@@ -318,6 +319,7 @@ class Benchmark {
  private:
   Cache* cache_;
   const FilterPolicy* filter_policy_;
+  bool log_open_;
   DB* db_;
   int num_;
   int value_size_;
@@ -411,7 +413,8 @@ class Benchmark {
     value_size_(FLAGS_value_size),
     entries_per_batch_(1),
     reads_(FLAGS_reads < 0 ? FLAGS_num : FLAGS_reads),
-    heap_counter_(0) {
+    heap_counter_(0) ,
+    log_open_(FLAGS_log_open){
     std::vector<std::string> files;
     g_env->GetChildren(FLAGS_db, &files);
     for (size_t i = 0; i < files.size(); i++) {
@@ -476,9 +479,10 @@ class Benchmark {
         method = &Benchmark::WriteRandom;
       } else if (name == Slice("fillsync")) {
         fresh_db = true;
-        num_ /= 1000;
+        //num_ /= 1000;
         write_options_.sync = true;
-        method = &Benchmark::WriteRandom;
+      //  method = &Benchmark::WriteRandom;
+	method = &Benchmark::WriteSeq;
       } else if (name == Slice("fill100K")) {
         fresh_db = true;
         num_ /= 1000;
@@ -718,6 +722,7 @@ class Benchmark {
     options.max_open_files = FLAGS_open_files;
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
+    options.log_open = log_open_;
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
@@ -999,6 +1004,9 @@ int main(int argc, char** argv) {
       FLAGS_open_files = n;
     } else if (strncmp(argv[i], "--db=", 5) == 0) {
       FLAGS_db = argv[i] + 5;
+    }else if (sscanf(argv[i], "--log_open=%d%c", &n, &junk) == 1 &&
+               (n == 0 || n == 1)){
+      FLAGS_log_open = n;
     } else {
       fprintf(stderr, "Invalid flag '%s'\n", argv[i]);
       exit(1);
