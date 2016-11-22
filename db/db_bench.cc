@@ -115,6 +115,8 @@ static bool FLAGS_reuse_logs = false;
 static const char* FLAGS_db = NULL;
 
 static bool FLAGS_log_open = true;
+
+static bool FLAGS_compression_open = false;
 namespace leveldb {
 
 namespace {
@@ -368,7 +370,7 @@ class Benchmark {
   }
 
   void PrintEnvironment() {
-    fprintf(stderr, "LevelDB:    version %d.%d\n",
+    fprintf(stdout, "LevelDB:    version %d.%d\n",
             kMajorVersion, kMinorVersion);
 
 #if defined(__linux)
@@ -396,8 +398,8 @@ class Benchmark {
         }
       }
       fclose(cpuinfo);
-      fprintf(stderr, "CPU:        %d * %s\n", num_cpus, cpu_type.c_str());
-      fprintf(stderr, "CPUCache:   %s\n", cache_size.c_str());
+      fprintf(stdout, "CPU:        %d * %s\n", num_cpus, cpu_type.c_str());
+      fprintf(stdout, "CPUCache:   %s\n", cache_size.c_str());
     }
 #endif
   }
@@ -723,6 +725,9 @@ class Benchmark {
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
     options.log_open = log_open_;
+    if(!FLAGS_compression_open){
+      options.compression = leveldb::kNoCompression;   
+    }
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
@@ -1007,6 +1012,9 @@ int main(int argc, char** argv) {
     }else if (sscanf(argv[i], "--log_open=%d%c", &n, &junk) == 1 &&
                (n == 0 || n == 1)){
       FLAGS_log_open = n;
+    } else if (sscanf(argv[i], "--compression_open=%d%c", &n, &junk) == 1 &&
+               (n == 0 || n == 1)){
+      FLAGS_compression_open = n;
     } else {
       fprintf(stderr, "Invalid flag '%s'\n", argv[i]);
       exit(1);
