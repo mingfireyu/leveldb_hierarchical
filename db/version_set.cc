@@ -17,7 +17,9 @@
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
 #include "util/logging.h"
-
+#include<sys/time.h>
+#include<unistd.h>
+#include <boost/concept_check.hpp>
 namespace leveldb {
 
 static int TargetFileSize(const Options* options) {
@@ -328,6 +330,16 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key,
     }
   }
 }
+unsigned long long  timeAddTo(struct timeval &begin_time,unsigned long long &timeSum);
+void readFileTimeProcess(struct timeval &start_time,unsigned int num){
+  unsigned long long diff = timeAddTo(start_time,readSums[MEM_LENGTH+num].ave);
+  readSums[MEM_LENGTH+num].count++;
+  if(diff > readSums[MEM_LENGTH+num].max){
+    readSums[MEM_LENGTH+num].max = diff;
+  }else if(diff < readSums[MEM_LENGTH+num].min){
+    readSums[MEM_LENGTH+num].min = diff;
+  }
+}
 
 Status Version::Get(const ReadOptions& options,
                     const LookupKey& k,
@@ -337,17 +349,18 @@ Status Version::Get(const ReadOptions& options,
   Slice user_key = k.user_key();
   const Comparator* ucmp = vset_->icmp_.user_comparator();
   Status s;
-
+  struct timeval start_time,end_time,res;
   stats->seek_file = NULL;
   stats->seek_file_level = -1;
   FileMetaData* last_file_read = NULL;
   int last_file_read_level = -1;
-
+  unsigned int readFilenum = 0;
   // We can search level-by-level since entries never hop across
   // levels.  Therefore we are guaranteed that if we find data
   // in an smaller level, later levels are irrelevant.
   std::vector<FileMetaData*> tmp;
   FileMetaData* tmp2;
+  gettimeofday(&start_time,NULL);
   for (int level = 0; level < config::kNumLevels; level++) {
     size_t num_files = files_[level].size();
     if (num_files == 0) continue;
@@ -389,7 +402,7 @@ Status Version::Get(const ReadOptions& options,
       }
     }
 
-    for (uint32_t i = 0; i < num_files; ++i) {
+    for (uint32_t i = 0; i < num_files; ++i,readFilenum++) {
       if (last_file_read != NULL && stats->seek_file == NULL) {
         // We have had more than one seek for this read.  Charge the 1st file.
         stats->seek_file = last_file_read;
@@ -414,8 +427,10 @@ Status Version::Get(const ReadOptions& options,
         case kNotFound:
           break;      // Keep searching in other files
         case kFound:
+	  readFileTimeProcess(start_time,readFilenum);
           return s;
         case kDeleted:
+	  readFileTimeProcess(start_time,readFilenum);
           s = Status::NotFound(Slice());  // Use empty error message for speed
           return s;
         case kCorrupt:

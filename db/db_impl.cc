@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
+#include <boost/iterator/iterator_concepts.hpp>
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
@@ -33,11 +34,13 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
+
 unsigned long long totalBytesWrite;
 unsigned long long totalWriteCount;
 unsigned long long immetableWrites;
 unsigned long long wait_count;
-
+STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
+static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
   MEM_TIME,
   LOG_TIME,
@@ -45,7 +48,7 @@ enum TIME_STATISTICS{
   TIME_LENGTH
 };
 unsigned long long timeSums[TIME_LENGTH];
-static const char timeString[][50]={"MEM_TIME_PERCENT","LOG_TIME_PERCENT","WAIT_TIME_PERCENT"};
+static const char timeString[][50]={"MEM_TIME","LOG_TIME","WAIT_TIME"};
 namespace leveldb {
 
 const int kNumNonTableCacheFiles = 10;
@@ -157,6 +160,10 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
+  
+  for(unsigned int i = 0 ; i < READMAXTIME+ MEM_LENGTH ;i++){
+    readSums[i].init();
+  }
   // Reserve ten files or so for other uses and give the rest to TableCache.
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
   table_cache_ = new TableCache(dbname_, &options_, table_cache_size);
@@ -188,18 +195,30 @@ DBImpl::~DBImpl() {
   delete table_cache_;
   printf("totalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
    printf("totalBytesWrite:%.2lfMB  totalWriteCount:%llu immetableWrite:%.2lfMB \n",totalBytesWrite*1.0/1024/1024,totalWriteCount,immetableWrites*1.0/1024/1024);
-  
+   
+   printf("\n---------------------MEM WRITE STATISTICS-----------------------------------------\n");
    for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
-    printf("%s:%llu\t",timeString[i],timeSums[i]);
+    printf("%s total:%llu\t",timeString[i],timeSums[i]);
     timeSum += timeSums[i];
   }
   printf("\n");
   for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
-    printf("%s:%.2lf%%\t",timeString[i],timeSums[i]*1.0/timeSum*100);
+    printf("%s percent:%.2lf%%\t",timeString[i],timeSums[i]*1.0/timeSum*100);
   }
   printf("\n");
   printf("wait count:%llu\n",wait_count);
  
+  printf("\n---------------------READ STATISTICS-----------------------------------------\n");
+  printf("type   \t\tcount\t\tmin\t\tave\t\tmax\n");
+  for(unsigned int i = 0 ; i < READMAXTIME+MEM_LENGTH ; i++){
+    if(readSums[i].count){
+      if(i == MEM_READ || i == IMEM_READ){
+	printf("%4s\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",readMemString[i],readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
+      }else{
+	printf("%u time\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",i-IMEM_READ,readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
+      }
+    }
+  }
   if (owns_info_log_) {
     delete options_.info_log;
   }
@@ -1140,13 +1159,23 @@ int64_t DBImpl::TEST_MaxNextLevelOverlappingBytes() {
   MutexLock l(&mutex_);
   return versions_->MaxNextLevelOverlappingBytes();
 }
-
+unsigned long long  timeAddTo(struct timeval &begin_time,unsigned long long &timeSum);
+void readMemTimeProcess(struct timeval &start_time,unsigned int num){
+   unsigned long long diff = timeAddTo(start_time,readSums[num].ave);
+   readSums[num].count++;
+  if(diff > readSums[num].max){
+    readSums[num].max = diff;
+  }else if(diff < readSums[num].min){
+    readSums[num].min = diff;
+  }
+}
 Status DBImpl::Get(const ReadOptions& options,
                    const Slice& key,
                    std::string* value) {
   Status s;
   MutexLock l(&mutex_);
   SequenceNumber snapshot;
+  struct timeval start_time;
   if (options.snapshot != NULL) {
     snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
   } else {
@@ -1162,7 +1191,7 @@ Status DBImpl::Get(const ReadOptions& options,
 
   bool have_stat_update = false;
   Version::GetStats stats;
-
+  gettimeofday(&start_time,NULL);
   // Unlock while reading from files and memtables
   {
     mutex_.Unlock();
@@ -1170,8 +1199,10 @@ Status DBImpl::Get(const ReadOptions& options,
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
       // Done
+      readMemTimeProcess(start_time,0);
     } else if (imm != NULL && imm->Get(lkey, value, &s)) {
       // Done
+      readMemTimeProcess(start_time,1);
     } else {
       s = current->Get(options, lkey, value, &stats);
       have_stat_update = true;
@@ -1226,13 +1257,15 @@ Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return DB::Delete(options, key);
 }
 
-void timeAddTo(struct timeval &begin_time,unsigned long long &timeSum){
+unsigned long long  timeAddTo(struct timeval &begin_time,unsigned long long &timeSum){
   struct timeval end_time,res;
+  unsigned long long diff;
   static const unsigned int sToUs = 1000000;
   gettimeofday(&end_time,NULL);
   timersub(&end_time,&begin_time,&res);
-  timeSum = timeSum + res.tv_sec * sToUs + res.tv_usec;
-  
+  diff = res.tv_sec * sToUs + res.tv_usec;
+  timeSum = timeSum + diff;
+  return diff;
 }
 Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
   Writer w(&mutex_);

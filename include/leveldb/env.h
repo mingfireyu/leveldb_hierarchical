@@ -18,7 +18,32 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include "leveldb/status.h"
+#include<sys/time.h>
+#include<unistd.h>
+#include "limits.h"
+typedef struct statisticsItem{
+  unsigned long long min;
+  unsigned long long max;
+  unsigned long long ave;
+  unsigned long long count;
+  statisticsItem(){
+    min = max = ave=0;
+  }
+  void init(){
+     ave = 0;
+     max = 0;
+     min = ULLONG_MAX;
+     count = 0;
+  }
+}STATISTICSITEM;
+enum READ_STATISTICS{
+  MEM_READ,
+  IMEM_READ,
+  MEM_LENGTH
+};
+static const unsigned int READMAXTIME=18;
 
+extern STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 namespace leveldb {
 
 class FileLock;
