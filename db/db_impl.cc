@@ -193,7 +193,7 @@ DBImpl::~DBImpl() {
   delete log_;
   delete logfile_;
   delete table_cache_;
-  printf("totalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
+  printf("\ntotalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
    printf("totalBytesWrite:%.2lfMB  totalWriteCount:%llu immetableWrite:%.2lfMB \n",totalBytesWrite*1.0/1024/1024,totalWriteCount,immetableWrites*1.0/1024/1024);
    
    printf("\n---------------------MEM WRITE STATISTICS-----------------------------------------\n");
@@ -207,7 +207,7 @@ DBImpl::~DBImpl() {
   }
   printf("\n");
   printf("wait count:%llu\n",wait_count);
- 
+  
   printf("\n---------------------READ STATISTICS-----------------------------------------\n");
   printf("type   \t\tcount\t\tmin\t\tave\t\tmax\n");
   for(unsigned int i = 0 ; i < READMAXTIME+MEM_LENGTH ; i++){
@@ -219,6 +219,7 @@ DBImpl::~DBImpl() {
       }
     }
   }
+  printf("\n");
   if (owns_info_log_) {
     delete options_.info_log;
   }

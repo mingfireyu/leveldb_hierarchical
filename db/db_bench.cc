@@ -17,7 +17,7 @@
 #include "util/mutexlock.h"
 #include "util/random.h"
 #include "util/testutil.h"
-
+#include <iostream>
 // Comma-separated list of operations to run in the specified order
 //   Actual benchmarks:
 //      fillseq       -- write N values in sequential key order in async mode
@@ -535,6 +535,11 @@ class Benchmark {
       }
 
       if (fresh_db) {
+	printf("\n----------------------------------------------\n");
+	std::string stat_str;
+	db_->GetProperty("leveldb.stats",&stat_str);
+	std::cout<<stat_str<<std::endl;
+
         if (FLAGS_use_existing_db) {
           fprintf(stdout, "%-12s : skipped (--use_existing_db is true)\n",
                   name.ToString().c_str());
