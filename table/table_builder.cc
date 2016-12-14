@@ -14,7 +14,7 @@
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
-
+#include <cstdio>
 namespace leveldb {
 
 struct TableBuilder::Rep {
@@ -58,7 +58,10 @@ struct TableBuilder::Rep {
         filter_block(opt.filter_policy == NULL ? NULL
                      : new FilterBlockBuilder(opt.filter_policy)),
         pending_index_entry(false) {
-    filter_block->setLevel(level_);
+   
+    if(opt.filter_policy){
+      filter_block->setLevel(level);
+    }
     index_block_options.block_restart_interval = 1;
   }
 };

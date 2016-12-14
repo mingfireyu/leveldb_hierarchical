@@ -5,6 +5,7 @@
 #include "db/db_impl.h"
 #include<sys/time.h>
 #include<unistd.h>
+#include<iostream>
 #include <algorithm>
 #include <set>
 #include <string>
@@ -181,7 +182,7 @@ DBImpl::~DBImpl() {
     bg_cv_.Wait();
   }
   mutex_.Unlock();
-
+  
   if (db_lock_ != NULL) {
     env_->UnlockFile(db_lock_);
   }
@@ -551,6 +552,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
       (unsigned long long) meta.number);
   
    int level1 = 0;
+   iter->SeekToFirst();
    if(iter->Valid()){
       iter->SeekToFirst();
       meta.smallest.DecodeFrom(iter->key());
@@ -1515,7 +1517,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
       return true;
     }
   } else if (in == "stats") {
-    char buf[200];
+    char buf[300];
     snprintf(buf, sizeof(buf),
              "                               Compactions\n"
              "Level  Files Size(MB) Time(sec) Read(MB) Write(MB)\n"
@@ -1530,10 +1532,28 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
             "%3d %8d %8.0f %9.0f %8.0f %9.0f\n",
             level,
             files,
-            versions_->NumLevelBytes(level) / 1048576.0,
+            versions_->NumLevelBytes(level) / 1048576.0 ,
             stats_[level].micros / 1e6,
             stats_[level].bytes_read / 1048576.0,
             stats_[level].bytes_written / 1048576.0);
+        value->append(buf);
+      }
+    }
+    snprintf(buf, sizeof(buf),
+             "                               Compactions\n"
+             "Level  Files Size(B) \n"
+             "--------------------------------------------------\n"
+             );
+    value->append(buf);
+    for(int level = 0 ; level < config::kNumLevels ; level++){
+       int files = versions_->NumLevelFiles(level);
+      if (stats_[level].micros > 0 || files > 0) {
+        snprintf(
+            buf, sizeof(buf),
+            "%3d %8d %lld",
+            level,
+            files,
+            (unsigned long long)versions_->NumLevelBytes(level) );
         value->append(buf);
       }
     }

@@ -7,7 +7,7 @@
 #include "leveldb/filter_policy.h"
 #include "util/coding.h"
 #include <db/dbformat.h>
-
+#include<cstdio>
 namespace leveldb {
 
 // See doc/table_format.txt for an explanation of the filter block format.
@@ -79,7 +79,7 @@ void FilterBlockBuilder::GenerateFilter() {
 void FilterBlockBuilder::setLevel(int level)
 {
   assert(level < config::kNumLevels&&level >= 0);
-  level_ = level;
+  this->level_ = level;
 }
 
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
