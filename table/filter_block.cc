@@ -6,6 +6,7 @@
 
 #include "leveldb/filter_policy.h"
 #include "util/coding.h"
+#include <db/dbformat.h>
 
 namespace leveldb {
 
@@ -68,11 +69,17 @@ void FilterBlockBuilder::GenerateFilter() {
 
   // Generate filter for current set of keys and append to result_.
   filter_offsets_.push_back(result_.size());
-  policy_->CreateFilter(&tmp_keys_[0], static_cast<int>(num_keys), &result_);
+  policy_->CreateFilter(&tmp_keys_[0], static_cast<int>(num_keys), &result_,level_);
 
   tmp_keys_.clear();
   keys_.clear();
   start_.clear();
+}
+
+void FilterBlockBuilder::setLevel(int level)
+{
+  assert(level < config::kNumLevels&&level >= 0);
+  level_ = level;
 }
 
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,

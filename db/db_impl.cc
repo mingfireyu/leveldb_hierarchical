@@ -549,7 +549,20 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long) meta.number);
-
+  
+   int level1 = 0;
+   if(iter->Valid()){
+      iter->SeekToFirst();
+      meta.smallest.DecodeFrom(iter->key());
+      iter->SeekToLast();
+      meta.largest.DecodeFrom(iter->key());
+      const Slice min_user_key = meta.smallest.user_key();
+      const Slice max_user_key = meta.largest.user_key();
+      if (base != NULL) {
+	level1 = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
+      }
+      meta.level = level1;
+   }
   Status s;
   {
     mutex_.Unlock();
@@ -569,12 +582,13 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   // should not be added to the manifest.
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
-    const Slice min_user_key = meta.smallest.user_key();
-    const Slice max_user_key = meta.largest.user_key();
-    if (base != NULL) {
-      level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
-    }
-    edit->AddFile(level, meta.number, meta.file_size,
+      const Slice min_user_key = meta.smallest.user_key();
+      const Slice max_user_key = meta.largest.user_key();
+      if (base != NULL) {
+	level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
+	assert(level == level1);
+      }
+      edit->AddFile(level, meta.number, meta.file_size,
                   meta.smallest, meta.largest);
   }
 
@@ -840,7 +854,7 @@ void DBImpl::CleanupCompaction(CompactionState* compact) {
   delete compact;
 }
 
-Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
+Status DBImpl::OpenCompactionOutputFile(CompactionState* compact,int level1) {
   assert(compact != NULL);
   assert(compact->builder == NULL);
   uint64_t file_number;
@@ -860,7 +874,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
   if (s.ok()) {
-    compact->builder = new TableBuilder(options_, compact->outfile);
+    compact->builder = new TableBuilder(options_, compact->outfile,level1);
   }
   return s;
 }
@@ -948,7 +962,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       compact->compaction->level(),
       compact->compaction->num_input_files(1),
       compact->compaction->level() + 1);
-
+  int level1 = compact->compaction->level()+1;
   assert(versions_->NumLevelFiles(compact->compaction->level()) > 0);
   assert(compact->builder == NULL);
   assert(compact->outfile == NULL);
@@ -1038,7 +1052,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     if (!drop) {
       // Open output file if necessary
       if (compact->builder == NULL) {
-        status = OpenCompactionOutputFile(compact);
+        status = OpenCompactionOutputFile(compact,level1);
         if (!status.ok()) {
           break;
         }

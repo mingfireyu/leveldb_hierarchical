@@ -20,7 +20,7 @@ class TestHashFilter : public FilterPolicy {
     return "TestHashFilter";
   }
 
-  virtual void CreateFilter(const Slice* keys, int n, std::string* dst) const {
+  virtual void CreateFilter(const Slice* keys, int n, std::string* dst,int level) const {
     for (int i = 0; i < n; i++) {
       uint32_t h = Hash(keys[i].data(), keys[i].size(), 1);
       PutFixed32(dst, h);

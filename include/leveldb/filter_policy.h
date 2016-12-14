@@ -38,7 +38,7 @@ class FilterPolicy {
   //
   // Warning: do not change the initial contents of *dst.  Instead,
   // append the newly constructed filter to *dst.
-  virtual void CreateFilter(const Slice* keys, int n, std::string* dst)
+  virtual void CreateFilter(const Slice* keys, int n, std::string* dst,int level=0)
       const = 0;
 
   // "filter" contains the data appended by a preceding call to

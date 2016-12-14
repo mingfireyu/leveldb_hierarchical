@@ -1,9 +1,9 @@
 #!/bin/bash
-totalsize=$(expr 1024 \* 1024 \* 1024 \* 10)
-totalsize=$(expr 1024 \* 1024)
-benchmarks=fillseq,fillrandom
+totalsize=$(expr 1024 \* 1024 \* 1024 \* 1)
+#totalsize=$(expr 1024 \* 1024)
+benchmarks=fillrandom,readrandom
 value_size=$[64]
-value_size=65536
+#value_size=65536
 let num=totalsize/value_size
 bloom_bits=10
 log_open=1
@@ -19,6 +19,6 @@ db=/home/ming/testdb
 # done
 #
 
-    time ./db_bench --db="$db" --benchmarks="$benchmarks" --value_size="$value_size" --num="$num" --bloom_bits="$bloom_bits" --log_open="$log_open"  > bench_result_"$value_size"B_"$num"_l"$log_open" 
-    log_open=0
-    time ./db_bench --db="$db" --benchmarks="$benchmarks" --value_size="$value_size" --num="$num" --bloom_bits="$bloom_bits" --log_open="$log_open" > bench_result_"$value_size"B_"$num"_l"$log_open" 
+    time ./db_bench --db="$db" --benchmarks="$benchmarks" --value_size="$value_size" --num="$num" --bloom_bits="$bloom_bits" --log_open="$log_open"  #> bench_result_"$value_size"B_"$num"_l"$log_open" 
+    # log_open=0
+    # time ./db_bench --db="$db" --benchmarks="$benchmarks" --value_size="$value_size" --num="$num" --bloom_bits="$bloom_bits" --log_open="$log_open" #> bench_result_"$value_size"B_"$num"_l"$log_open" 

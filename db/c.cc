@@ -105,7 +105,7 @@ struct leveldb_filterpolicy_t : public FilterPolicy {
     return (*name_)(state_);
   }
 
-  virtual void CreateFilter(const Slice* keys, int n, std::string* dst) const {
+  virtual void CreateFilter(const Slice* keys, int n, std::string* dst,int level) const {
     std::vector<const char*> key_pointers(n);
     std::vector<size_t> key_sizes(n);
     for (int i = 0; i < n; i++) {
@@ -504,8 +504,8 @@ leveldb_filterpolicy_t* leveldb_filterpolicy_create_bloom(int bits_per_key) {
     const FilterPolicy* rep_;
     ~Wrapper() { delete rep_; }
     const char* Name() const { return rep_->Name(); }
-    void CreateFilter(const Slice* keys, int n, std::string* dst) const {
-      return rep_->CreateFilter(keys, n, dst);
+    void CreateFilter(const Slice* keys, int n, std::string* dst,int level) const {
+      return rep_->CreateFilter(keys, n, dst,0);
     }
     bool KeyMayMatch(const Slice& key, const Slice& filter) const {
       return rep_->KeyMayMatch(key, filter);
