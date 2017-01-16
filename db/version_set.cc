@@ -13,6 +13,7 @@
 #include "db/table_cache.h"
 #include "leveldb/env.h"
 #include "leveldb/table_builder.h"
+#include "../include/leveldb/statistics.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
@@ -407,6 +408,7 @@ Status Version::Get(const ReadOptions& options,
       saver.value = value;
       s = vset_->table_cache_->Get(options, f->number, f->file_size,
                                    ikey, &saver, SaveValue);
+      Statistics::getInstance()->addToAccess(1,level);
       if (!s.ok()) {
         return s;
       }
@@ -414,6 +416,7 @@ Status Version::Get(const ReadOptions& options,
         case kNotFound:
           break;      // Keep searching in other files
         case kFound:
+	  Statistics::getInstance()->addToGet(1,level);
           return s;
         case kDeleted:
           s = Status::NotFound(Slice());  // Use empty error message for speed

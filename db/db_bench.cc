@@ -11,6 +11,7 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/write_batch.h"
+#include <leveldb/statistics.h>
 #include "port/port.h"
 #include "util/crc32c.h"
 #include "util/histogram.h"
@@ -812,6 +813,7 @@ class Benchmark {
     }
     char msg[100];
     snprintf(msg, sizeof(msg), "(%d of %d found)", found, num_);
+    //Statistics::getInstance()->print();
     thread->stats.AddMessage(msg);
   }
 

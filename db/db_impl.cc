@@ -25,6 +25,7 @@
 #include "leveldb/status.h"
 #include "leveldb/table.h"
 #include "leveldb/table_builder.h"
+#include "../include/leveldb/statistics.h"
 #include "port/port.h"
 #include "table/block.h"
 #include "table/merger.h"
@@ -157,7 +158,7 @@ DBImpl::~DBImpl() {
   if (db_lock_ != NULL) {
     env_->UnlockFile(db_lock_);
   }
-
+  
   delete versions_;
   if (mem_ != NULL) mem_->Unref();
   if (imm_ != NULL) imm_->Unref();
@@ -165,7 +166,7 @@ DBImpl::~DBImpl() {
   delete log_;
   delete logfile_;
   delete table_cache_;
-
+  Statistics::DestroyInstance();
   if (owns_info_log_) {
     delete options_.info_log;
   }
