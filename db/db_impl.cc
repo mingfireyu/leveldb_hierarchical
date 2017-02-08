@@ -40,6 +40,8 @@ unsigned long long totalBytesWrite;
 unsigned long long totalWriteCount;
 unsigned long long immetableWrites;
 unsigned long long wait_count;
+unsigned long long compactionCount;   //BackGroud compaction
+unsigned long long trivialMoveCount;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -157,7 +159,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   totalWriteCount = 0;
   immetableWrites = 0;
   wait_count = 0;
-
+  compactionCount = 0;
+  trivialMoveCount = 0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -554,7 +557,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
    int level1 = 0;
    iter->SeekToFirst();
    if(iter->Valid()){
-      iter->SeekToFirst();
+      iter->SeekToFirst();                    //TODO:may be not required
       meta.smallest.DecodeFrom(iter->key());
       iter->SeekToLast();
       meta.largest.DecodeFrom(iter->key());
@@ -787,6 +790,8 @@ void DBImpl::BackgroundCompaction() {
     // Nothing to do
   } else if (!is_manual && c->IsTrivialMove()) {
     // Move file to next level
+    trivialMoveCount++;
+    compactionCount++;
     assert(c->num_input_files(0) == 1);
     FileMetaData* f = c->input(0, 0);
     c->edit()->DeleteFile(c->level(), f->number);
@@ -812,6 +817,7 @@ void DBImpl::BackgroundCompaction() {
     CleanupCompaction(compact);
     c->ReleaseInputs();
     DeleteObsoleteFiles();
+    compactionCount++;
   }
   delete c;
 
@@ -1557,6 +1563,8 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
+    
+    snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();

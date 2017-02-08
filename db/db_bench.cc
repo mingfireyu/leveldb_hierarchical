@@ -728,6 +728,7 @@ class Benchmark {
     options.block_size = FLAGS_block_size;
     options.max_open_files = FLAGS_open_files;
     options.filter_policy = filter_policy_;
+    fprintf(stderr,"\nfilter_policy name:%s",filter_policy_->Name());
     options.reuse_logs = FLAGS_reuse_logs;
     options.log_open = log_open_;
     if(!FLAGS_compression_open){

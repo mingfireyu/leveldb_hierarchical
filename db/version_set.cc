@@ -1485,7 +1485,7 @@ bool Compaction::IsTrivialMove() const {
   // a very expensive merge later on.
   return (num_input_files(0) == 1 && num_input_files(1) == 0 &&
           TotalFileSize(grandparents_) <=
-              MaxGrandParentOverlapBytes(vset->options_) && false);
+              MaxGrandParentOverlapBytes(vset->options_));
 }
 
 void Compaction::AddInputDeletions(VersionEdit* edit) {
