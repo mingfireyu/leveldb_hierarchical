@@ -14,7 +14,7 @@ namespace {
 static uint32_t BloomHash(const Slice& key) {
   return Hash(key.data(), key.size(), 0xbc9f1d34);
 }
-static size_t bits[] = {23,20,18,19,9,10,10};
+  static size_t bits[] = {31,30,27,28,18,9,9};
 class BloomFilterPolicy : public FilterPolicy {
  private:
   size_t bits_per_key_[config::kNumLevels];
