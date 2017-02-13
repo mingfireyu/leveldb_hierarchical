@@ -23,8 +23,8 @@
 #include "util/logging.h"
 #include "util/mutexlock.h"
 #include "util/posix_logger.h"
-extern unsigned long long totalBytesWrite;
-extern unsigned long long totalWriteCount;
+/*extern unsigned long long totalBytesWrite;
+extern unsigned long long totalWriteCount;*/
 namespace leveldb {
 
 namespace {
@@ -191,8 +191,8 @@ class PosixWritableFile : public WritableFile {
 
   virtual Status Append(const Slice& data) {
     size_t r = fwrite_unlocked(data.data(), 1, data.size(), file_);
-    totalBytesWrite += r;
-    totalWriteCount++;
+  /*  totalBytesWrite += r;
+    totalWriteCount++;*/
     if (r != data.size()) {
       return IOError(filename_, errno);
     }

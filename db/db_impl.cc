@@ -35,9 +35,9 @@
 #include "util/logging.h"
 #include "util/mutexlock.h"
 
-unsigned long long totalBytesWrite;
-unsigned long long totalWriteCount;
-unsigned long long immetableWrites;
+//unsigned long long totalBytesWrite;
+//unsigned long long totalWriteCount;
+//unsigned long long immetableWrites;
 unsigned long long wait_count;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
@@ -152,9 +152,9 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       bg_compaction_scheduled_(false),
       manual_compaction_(NULL) {
   has_imm_.Release_Store(NULL);
-  totalBytesWrite = 0;
+  /*totalBytesWrite = 0;
   totalWriteCount = 0;
-  immetableWrites = 0;
+  immetableWrites = 0;*/
   wait_count = 0;
 
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
@@ -193,8 +193,8 @@ DBImpl::~DBImpl() {
   delete log_;
   delete logfile_;
   delete table_cache_;
-  printf("\ntotalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
-   printf("totalBytesWrite:%.2lfMB  totalWriteCount:%llu immetableWrite:%.2lfMB \n",totalBytesWrite*1.0/1024/1024,totalWriteCount,immetableWrites*1.0/1024/1024);
+ // printf("\ntotalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
+  // printf("totalBytesWrite:%.2lfMB  totalWriteCount:%llu immetableWrite:%.2lfMB \n",totalBytesWrite*1.0/1024/1024,totalWriteCount,immetableWrites*1.0/1024/1024);
    
    printf("\n---------------------MEM WRITE STATISTICS-----------------------------------------\n");
    for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
