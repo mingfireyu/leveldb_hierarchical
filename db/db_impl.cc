@@ -38,7 +38,7 @@
 //unsigned long long totalBytesWrite;
 //unsigned long long totalWriteCount;
 //unsigned long long immetableWrites;
-unsigned long long wait_count;
+//unsigned long long wait_count;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -155,7 +155,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   /*totalBytesWrite = 0;
   totalWriteCount = 0;
   immetableWrites = 0;*/
-  wait_count = 0;
+  //  wait_count = 0;
 
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
@@ -196,17 +196,17 @@ DBImpl::~DBImpl() {
  // printf("\ntotalBytesWrite:%llu  totalWriteCount:%llu immetableWrite:%llu \n",totalBytesWrite,totalWriteCount,immetableWrites);
   // printf("totalBytesWrite:%.2lfMB  totalWriteCount:%llu immetableWrite:%.2lfMB \n",totalBytesWrite*1.0/1024/1024,totalWriteCount,immetableWrites*1.0/1024/1024);
    
-   printf("\n---------------------MEM WRITE STATISTICS-----------------------------------------\n");
-   for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
-    printf("%s total:%llu\t",timeString[i],timeSums[i]);
-    timeSum += timeSums[i];
-  }
-  printf("\n");
-  for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
-    printf("%s percent:%.2lf%%\t",timeString[i],timeSums[i]*1.0/timeSum*100);
-  }
-  printf("\n");
-  printf("wait count:%llu\n",wait_count);
+  //  printf("\n---------------------MEM WRITE STATISTICS-----------------------------------------\n");
+  //  for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
+  //   printf("%s total:%llu\t",timeString[i],timeSums[i]);
+  //   timeSum += timeSums[i];
+  // }
+  // printf("\n");
+  // for(unsigned int i = 0 ; i < TIME_LENGTH ; i++){
+  //   printf("%s percent:%.2lf%%\t",timeString[i],timeSums[i]*1.0/timeSum*100);
+  // }
+  // printf("\n");
+  // printf("wait count:%llu\n",wait_count);
   
   printf("\n---------------------READ STATISTICS-----------------------------------------\n");
   printf("type   \t\tcount\t\tmin\t\tave\t\tmax\n");
@@ -1286,9 +1286,9 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
   }
 
   // May temporarily unlock and wait.
-  gettimeofday(&begin_time,NULL);
+  //  gettimeofday(&begin_time,NULL);
   Status status = MakeRoomForWrite(my_batch == NULL);
-  timeAddTo(begin_time,timeSums[WAIT_TIME]);
+  //  timeAddTo(begin_time,timeSums[WAIT_TIME]);
   uint64_t last_sequence = versions_->LastSequence();
   Writer* last_writer = &w;
   if (status.ok() && my_batch != NULL) {  // NULL batch is for compactions
@@ -1302,7 +1302,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
     // into mem_.
     {
       mutex_.Unlock();
-      gettimeofday(&begin_time,NULL);
+      //  gettimeofday(&begin_time,NULL);
       bool sync_error = false;
       if(options_.log_open){
 	status = log_->AddRecord(WriteBatchInternal::Contents(updates));
@@ -1317,12 +1317,12 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
 	status = Status::OK();
       }
      
-     timeAddTo(begin_time,timeSums[LOG_TIME]);
-     gettimeofday(&begin_time,NULL);
+      //     timeAddTo(begin_time,timeSums[LOG_TIME]);
+     //     gettimeofday(&begin_time,NULL);
       if (status.ok()) {
         status = WriteBatchInternal::InsertInto(updates, mem_);
       }
-      timeAddTo(begin_time,timeSums[MEM_TIME]);
+      //      timeAddTo(begin_time,timeSums[MEM_TIME]);
       mutex_.Lock();
       if (sync_error) {
         // The state of the log file is indeterminate: the log record we
@@ -1411,7 +1411,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
   assert(!writers_.empty());
   bool allow_delay = !force;
   Status s;
-  struct timeval start_time,end_time,res;
+  //struct timeval start_time,end_time,res;
   while (true) {
     if (!bg_error_.ok()) {
       // Yield previous error
@@ -1430,7 +1430,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       env_->SleepForMicroseconds(1000);
       allow_delay = false;  // Do not delay a single write more than once
       mutex_.Lock();
-      wait_count++;
+      //wait_count++;
     } else if (!force &&
                (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {
       // There is room in current memtable
@@ -1440,12 +1440,12 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
       bg_cv_.Wait();
-      wait_count++;
+      //      wait_count++;
     } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) {
       // There are too many level-0 files.
       Log(options_.info_log, "Too many L0 files; waiting...\n");
       bg_cv_.Wait();
-      wait_count++;
+      //      wait_count++;
     } else {
       // Attempt to switch to a new memtable and trigger compaction of old
       assert(versions_->PrevLogNumber() == 0);
