@@ -19,7 +19,7 @@
 #include "util/logging.h"
 #include<sys/time.h>
 #include<unistd.h>
-#include <boost/concept_check.hpp>
+
 namespace leveldb {
 
 static int TargetFileSize(const Options* options) {
@@ -354,7 +354,7 @@ Status Version::Get(const ReadOptions& options,
   stats->seek_file_level = -1;
   FileMetaData* last_file_read = NULL;
   int last_file_read_level = -1;
-  unsigned int readFilenum = 0;
+  options.readFilenum = 0;
   // We can search level-by-level since entries never hop across
   // levels.  Therefore we are guaranteed that if we find data
   // in an smaller level, later levels are irrelevant.
@@ -402,7 +402,7 @@ Status Version::Get(const ReadOptions& options,
       }
     }
 
-    for (uint32_t i = 0; i < num_files; ++i,readFilenum++) {
+    for (uint32_t i = 0; i < num_files; ++i) {
       if (last_file_read != NULL && stats->seek_file == NULL) {
         // We have had more than one seek for this read.  Charge the 1st file.
         stats->seek_file = last_file_read;
@@ -427,10 +427,10 @@ Status Version::Get(const ReadOptions& options,
         case kNotFound:
           break;      // Keep searching in other files
         case kFound:
-	  readFileTimeProcess(start_time,readFilenum);
+	  readFileTimeProcess(start_time,options.readFilenum);
           return s;
         case kDeleted:
-	  readFileTimeProcess(start_time,readFilenum);
+	  readFileTimeProcess(start_time,options.readFilenum);
           s = Status::NotFound(Slice());  // Use empty error message for speed
           return s;
         case kCorrupt:

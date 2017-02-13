@@ -75,7 +75,7 @@ static int FLAGS_value_size = 100;
 
 // Arrange to generate values that shrink to this fraction of
 // their original size after compression
-static double FLAGS_compression_ratio = 0.5;
+static double FLAGS_compression_ratio = 1.0;
 
 // Print histogram of operation timings
 static bool FLAGS_histogram = false;
@@ -535,9 +535,9 @@ class Benchmark {
       }
 
       if (fresh_db) {
-	printf("\n----------------------------------------------\n");
+	//	printf("\n----------------------------------------------\n");
 	std::string stat_str;
-	db_->GetProperty("leveldb.stats",&stat_str);
+	//	db_->GetProperty("leveldb.stats",&stat_str);
 	std::cout<<stat_str<<std::endl;
 
         if (FLAGS_use_existing_db) {

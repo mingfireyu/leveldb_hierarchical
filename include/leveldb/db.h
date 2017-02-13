@@ -48,6 +48,7 @@ class DB {
   // OK on success.
   // Stores NULL in *dbptr and returns a non-OK status on error.
   // Caller should delete *dbptr when it is no longer needed.
+  static void printOption(const Options& options);
   static Status Open(const Options& options,
                      const std::string& name,
                      DB** dbptr);

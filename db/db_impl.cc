@@ -581,7 +581,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   CompactionStats stats;
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
-  immetableWrites += meta.file_size;
+  //  immetableWrites += meta.file_size;
   stats_[level].Add(stats);
   return s;
 }
@@ -1587,10 +1587,16 @@ Status DB::Delete(const WriteOptions& opt, const Slice& key) {
 
 DB::~DB() { }
 
+void DB::printOption(const Options& options){
+  printf("Options used in leveldb\n");
+  printf("compression\tmax_file_size\twrite_buffer_size\n");
+  printf("%11s\t%11ldMB\t%15ldMB\n",options.compression == leveldb::kNoCompression?"NoCompress":"Compress",options.max_file_size/1024/1024,options.write_buffer_size/1024/1024);
+}
+
 Status DB::Open(const Options& options, const std::string& dbname,
                 DB** dbptr) {
   *dbptr = NULL;
-
+  printOption(options);
   DBImpl* impl = new DBImpl(options, dbname);
   impl->mutex_.Lock();
   VersionEdit edit;
@@ -1628,6 +1634,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
   } else {
     delete impl;
   }
+
   return s;
 }
 
