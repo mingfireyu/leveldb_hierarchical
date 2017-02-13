@@ -555,9 +555,9 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
       (unsigned long long) meta.number);
   
    int level1 = 0;
-   iter->SeekToFirst();
+  // iter->SeekToFirst();
    if(iter->Valid()){
-      iter->SeekToFirst();                    //TODO:may be not required
+      iter->SeekToFirst();                   
       meta.smallest.DecodeFrom(iter->key());
       iter->SeekToLast();
       meta.largest.DecodeFrom(iter->key());
@@ -587,12 +587,13 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   // should not be added to the manifest.
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
-      const Slice min_user_key = meta.smallest.user_key();
+      /*const Slice min_user_key = meta.smallest.user_key();
       const Slice max_user_key = meta.largest.user_key();
       if (base != NULL) {
 	level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
 	assert(level == level1);
-      }
+      }*/
+      level = level1;
       edit->AddFile(level, meta.number, meta.file_size,
                   meta.smallest, meta.largest);
   }
