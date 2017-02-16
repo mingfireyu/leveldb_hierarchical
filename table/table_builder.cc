@@ -14,7 +14,7 @@
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
-
+#include <cstdio>
 namespace leveldb {
 
 struct TableBuilder::Rep {
@@ -28,8 +28,9 @@ struct TableBuilder::Rep {
   std::string last_key;
   int64_t num_entries;
   bool closed;          // Either Finish() or Abandon() has been called.
+  int level_;
   FilterBlockBuilder* filter_block;
-
+  
   // We do not emit the index entry for a block until we have seen the
   // first key for the next data block.  This allows us to use shorter
   // keys in the index block.  For example, consider a block boundary
@@ -44,7 +45,7 @@ struct TableBuilder::Rep {
 
   std::string compressed_output;
 
-  Rep(const Options& opt, WritableFile* f)
+  Rep(const Options& opt, WritableFile* f,int level)
       : options(opt),
         index_block_options(opt),
         file(f),
@@ -53,20 +54,29 @@ struct TableBuilder::Rep {
         index_block(&index_block_options),
         num_entries(0),
         closed(false),
+        level_(level),
         filter_block(opt.filter_policy == NULL ? NULL
                      : new FilterBlockBuilder(opt.filter_policy)),
         pending_index_entry(false) {
+   
+    if(opt.filter_policy){
+      filter_block->setLevel(level);
+    }
     index_block_options.block_restart_interval = 1;
   }
 };
 
-TableBuilder::TableBuilder(const Options& options, WritableFile* file)
-    : rep_(new Rep(options, file)) {
+TableBuilder::TableBuilder(const Options& options, WritableFile* file,int level)
+    : rep_(new Rep(options, file,level)) {
   if (rep_->filter_block != NULL) {
     rep_->filter_block->StartBlock(0);
   }
 }
-
+TableBuilder::TableBuilder(const Options& options, WritableFile* file):rep_(new Rep(options,file,-1)){
+   if (rep_->filter_block != NULL) {
+    rep_->filter_block->StartBlock(0);
+  }
+}
 TableBuilder::~TableBuilder() {
   assert(rep_->closed);  // Catch errors where caller forgot to call Finish()
   delete rep_->filter_block;

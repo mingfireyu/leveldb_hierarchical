@@ -5,6 +5,7 @@
 #include "db/db_impl.h"
 #include<sys/time.h>
 #include<unistd.h>
+#include<iostream>
 #include <algorithm>
 #include <set>
 #include <string>
@@ -35,10 +36,12 @@
 #include "util/logging.h"
 #include "util/mutexlock.h"
 
-//unsigned long long totalBytesWrite;
-//unsigned long long totalWriteCount;
-//unsigned long long immetableWrites;
-//unsigned long long wait_count;
+unsigned long long totalBytesWrite;
+unsigned long long totalWriteCount;
+unsigned long long immetableWrites;
+unsigned long long wait_count;
+unsigned long long compactionCount;   //BackGroud compaction
+unsigned long long trivialMoveCount;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -152,11 +155,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       bg_compaction_scheduled_(false),
       manual_compaction_(NULL) {
   has_imm_.Release_Store(NULL);
-  /*totalBytesWrite = 0;
-  totalWriteCount = 0;
-  immetableWrites = 0;*/
-  //  wait_count = 0;
-
+  compactionCount = 0;
+  trivialMoveCount = 0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -181,7 +181,7 @@ DBImpl::~DBImpl() {
     bg_cv_.Wait();
   }
   mutex_.Unlock();
-
+  
   if (db_lock_ != NULL) {
     env_->UnlockFile(db_lock_);
   }
@@ -549,7 +549,21 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long) meta.number);
-
+  
+   int level1 = 0;
+  // iter->SeekToFirst();
+   if(iter->Valid()){
+      iter->SeekToFirst();                   
+      meta.smallest.DecodeFrom(iter->key());
+      iter->SeekToLast();
+      meta.largest.DecodeFrom(iter->key());
+      const Slice min_user_key = meta.smallest.user_key();
+      const Slice max_user_key = meta.largest.user_key();
+      if (base != NULL) {
+	level1 = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
+      }
+      meta.level = level1;
+   }
   Status s;
   {
     mutex_.Unlock();
@@ -569,12 +583,14 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   // should not be added to the manifest.
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
-    const Slice min_user_key = meta.smallest.user_key();
-    const Slice max_user_key = meta.largest.user_key();
-    if (base != NULL) {
-      level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
-    }
-    edit->AddFile(level, meta.number, meta.file_size,
+      /*const Slice min_user_key = meta.smallest.user_key();
+      const Slice max_user_key = meta.largest.user_key();
+      if (base != NULL) {
+	level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
+	assert(level == level1);
+      }*/
+      level = level1;
+      edit->AddFile(level, meta.number, meta.file_size,
                   meta.smallest, meta.largest);
   }
 
@@ -771,6 +787,8 @@ void DBImpl::BackgroundCompaction() {
     // Nothing to do
   } else if (!is_manual && c->IsTrivialMove()) {
     // Move file to next level
+    trivialMoveCount++;
+    compactionCount++;
     assert(c->num_input_files(0) == 1);
     FileMetaData* f = c->input(0, 0);
     c->edit()->DeleteFile(c->level(), f->number);
@@ -796,6 +814,7 @@ void DBImpl::BackgroundCompaction() {
     CleanupCompaction(compact);
     c->ReleaseInputs();
     DeleteObsoleteFiles();
+    compactionCount++;
   }
   delete c;
 
@@ -840,7 +859,7 @@ void DBImpl::CleanupCompaction(CompactionState* compact) {
   delete compact;
 }
 
-Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
+Status DBImpl::OpenCompactionOutputFile(CompactionState* compact,int level1) {
   assert(compact != NULL);
   assert(compact->builder == NULL);
   uint64_t file_number;
@@ -860,7 +879,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
   if (s.ok()) {
-    compact->builder = new TableBuilder(options_, compact->outfile);
+    compact->builder = new TableBuilder(options_, compact->outfile,level1);
   }
   return s;
 }
@@ -948,7 +967,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       compact->compaction->level(),
       compact->compaction->num_input_files(1),
       compact->compaction->level() + 1);
-
+  int level1 = compact->compaction->level()+1;
   assert(versions_->NumLevelFiles(compact->compaction->level()) > 0);
   assert(compact->builder == NULL);
   assert(compact->outfile == NULL);
@@ -1038,7 +1057,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     if (!drop) {
       // Open output file if necessary
       if (compact->builder == NULL) {
-        status = OpenCompactionOutputFile(compact);
+        status = OpenCompactionOutputFile(compact,level1);
         if (!status.ok()) {
           break;
         }
@@ -1501,7 +1520,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
       return true;
     }
   } else if (in == "stats") {
-    char buf[200];
+    char buf[300];
     snprintf(buf, sizeof(buf),
              "                               Compactions\n"
              "Level  Files Size(MB) Time(sec) Read(MB) Write(MB)\n"
@@ -1516,13 +1535,33 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
             "%3d %8d %8.0f %9.0f %8.0f %9.0f\n",
             level,
             files,
-            versions_->NumLevelBytes(level) / 1048576.0,
+            versions_->NumLevelBytes(level) / 1048576.0 ,
             stats_[level].micros / 1e6,
             stats_[level].bytes_read / 1048576.0,
             stats_[level].bytes_written / 1048576.0);
         value->append(buf);
       }
     }
+    snprintf(buf, sizeof(buf),
+             "                               Compactions\n"
+             "Level  Files Size(B) \n"
+             "--------------------------------------------------\n"
+             );
+    value->append(buf);
+    for(int level = 0 ; level < config::kNumLevels ; level++){
+       int files = versions_->NumLevelFiles(level);
+      if (stats_[level].micros > 0 || files > 0) {
+        snprintf(
+            buf, sizeof(buf),
+            "%3d %8d %lld",
+            level,
+            files,
+            (unsigned long long)versions_->NumLevelBytes(level) );
+        value->append(buf);
+      }
+    }
+    
+    snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();

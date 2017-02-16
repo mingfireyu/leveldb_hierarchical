@@ -6,6 +6,7 @@
 
 #include "leveldb/slice.h"
 #include "util/hash.h"
+#include <db/dbformat.h>
 
 namespace leveldb {
 
@@ -13,29 +14,31 @@ namespace {
 static uint32_t BloomHash(const Slice& key) {
   return Hash(key.data(), key.size(), 0xbc9f1d34);
 }
-
+  static size_t bits[] = {31,30,27,28,18,9,9};
 class BloomFilterPolicy : public FilterPolicy {
  private:
-  size_t bits_per_key_;
-  size_t k_;
-
+  size_t bits_per_key_[config::kNumLevels];
+  size_t k_[config::kNumLevels];
+  
  public:
-  explicit BloomFilterPolicy(int bits_per_key)
-      : bits_per_key_(bits_per_key) {
-    printf("\nfilterPolicyName:%s\n",Name());
+  explicit BloomFilterPolicy(int bits_per_key){
     // We intentionally round down to reduce probing cost a little bit
-    k_ = static_cast<size_t>(bits_per_key * 0.69);  // 0.69 =~ ln(2)
-    if (k_ < 1) k_ = 1;
-    if (k_ > 30) k_ = 30;
+    for(unsigned int i = 0 ; i < config::kNumLevels ; i++){
+      bits_per_key_[i] = bits[i];
+      k_[i]= static_cast<size_t>(bits_per_key_[i] * 0.69);  // 0.69 =~ ln(2)
+    
+      if (k_[i] < 1) k_[i] = 1;
+      if (k_[i] > 30) k_[i] = 30;
+    }
   }
 
   virtual const char* Name() const {
-    return "leveldb.BuiltinBloomFilter2";
+    return "leveldb.DynamicBloomFilter";
   }
 
   virtual void CreateFilter(const Slice* keys, int n, std::string* dst,int level) const {
     // Compute bloom filter size (in both bits and bytes)
-    size_t bits = n * bits_per_key_;
+    size_t bits = n * bits_per_key_[level];
 
     // For small n, we can see a very high false positive rate.  Fix it
     // by enforcing a minimum bloom filter length.
@@ -46,14 +49,14 @@ class BloomFilterPolicy : public FilterPolicy {
 
     const size_t init_size = dst->size();
     dst->resize(init_size + bytes, 0);
-    dst->push_back(static_cast<char>(k_));  // Remember # of probes in filter
+    dst->push_back(static_cast<char>(k_[level]));  // Remember # of probes in filter
     char* array = &(*dst)[init_size];
     for (int i = 0; i < n; i++) {
       // Use double-hashing to generate a sequence of hash values.
       // See analysis in [Kirsch,Mitzenmacher 2006].
       uint32_t h = BloomHash(keys[i]);
       const uint32_t delta = (h >> 17) | (h << 15);  // Rotate right 17 bits
-      for (size_t j = 0; j < k_; j++) {
+      for (size_t j = 0; j < k_[level]; j++) {
         const uint32_t bitpos = h % bits;
         array[bitpos/8] |= (1 << (bitpos % 8));
         h += delta;
@@ -89,8 +92,8 @@ class BloomFilterPolicy : public FilterPolicy {
 };
 }
 
-/*const FilterPolicy* NewBloomFilterPolicy(int bits_per_key) {
+const FilterPolicy* NewBloomFilterPolicy(int bits_per_key) {
   return new BloomFilterPolicy(bits_per_key);
-}*/
+}
 
 }  // namespace leveldb
