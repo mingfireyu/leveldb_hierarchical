@@ -1,0 +1,56 @@
+
+filterPolicyName:leveldb.BuiltinBloomFilter2
+LevelDB:    version 1.19
+CPU:        4 * Intel(R) Core(TM) i5-4460  CPU @ 3.20GHz
+CPUCache:   6144 KB
+Keys:       16 bytes each
+Values:     128 bytes each (128 bytes after compression)
+Entries:    838860800
+RawSize:    115200.0 MB (estimated)
+FileSize:   115200.0 MB (estimated)
+WARNING: Snappy compression is not enabled
+------------------------------------------------
+Options used in leveldb
+compression	max_file_size	write_buffer_size	max_open_files
+ NoCompress	          4MB	              4MB	         50000
+
+
+---------------------READ STATISTICS-----------------------------------------
+type   		count		min		ave		max
+
+Options used in leveldb
+compression	max_file_size	write_buffer_size	max_open_files
+ NoCompress	          4MB	              4MB	         50000
+fillrandom   :      41.518 micros/op;    3.3 MB/s
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        4       13      1471        0    119524
+  1       14       50      2677   201753    200730
+  2       86      224      7145   544896    544158
+  3      906     2250      9582   697593    695644
+  4     6486    22499      8494   631808    620217
+  5    17096    69111      1828   131409    121334
+
+readrandom   :    2268.639 micros/op; (100000 of 838860800 found)
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        4       13      1471        0    119524
+  1        6       19      2677   201753    200730
+  2       74      201      7147   545000    544263
+  3      826     2007      9589   697955    696004
+  4     5843    20106      8548   634845    623173
+  5    17486    70605      1961   139836    128647
+
+
+---------------------READ STATISTICS-----------------------------------------
+type   		count		min		ave		max
+2 time		92575		7		2025.74		804530
+3 time		6960		13		2801.15		583411
+4 time		404		28		3818.10		66527
+5 time		55		44		4266.45		35340
+6 time		6		698		8489.83		24024
+
