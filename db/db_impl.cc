@@ -1562,6 +1562,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     }
     
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
+    value->append(buf);
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();
