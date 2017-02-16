@@ -1589,8 +1589,8 @@ DB::~DB() { }
 
 void DB::printOption(const Options& options){
   printf("Options used in leveldb\n");
-  printf("compression\tmax_file_size\twrite_buffer_size\n");
-  printf("%11s\t%11ldMB\t%15ldMB\n",options.compression == leveldb::kNoCompression?"NoCompress":"Compress",options.max_file_size/1024/1024,options.write_buffer_size/1024/1024);
+  printf("compression\tmax_file_size\twrite_buffer_size\tmax_open_files\n");
+  printf("%11s\t%11ldMB\t%15ldMB\t%14d\n",options.compression == leveldb::kNoCompression?"NoCompress":"Compress",options.max_file_size/1024/1024,options.write_buffer_size/1024/1024,options.max_open_files);
 }
 
 Status DB::Open(const Options& options, const std::string& dbname,
