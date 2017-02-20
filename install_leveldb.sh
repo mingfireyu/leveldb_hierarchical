@@ -1,5 +1,5 @@
-make
 sudo cp -r include/leveldb /usr/include
+make clean && make
 sudo cp out-shared/libleveldb.so.1.19 /usr/lib
 sudo cp out-static/libleveldb.a /usr/local/lib
 cp out-static/libleveldb.a ./

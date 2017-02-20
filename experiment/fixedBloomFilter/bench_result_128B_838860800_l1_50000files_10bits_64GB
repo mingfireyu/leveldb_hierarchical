@@ -1,0 +1,69 @@
+
+filterPolicyName:leveldb.BuiltinBloomFilter2
+LevelDB:    version 1.19
+CPU:        48 * Intel(R) Xeon(R) CPU E5-2650 v4 @ 2.20GHz
+CPUCache:   30720 KB
+Keys:       16 bytes each
+Values:     128 bytes each (128 bytes after compression)
+Entries:    838860800
+RawSize:    115200.0 MB (estimated)
+FileSize:   115200.0 MB (estimated)
+------------------------------------------------
+Options used in leveldb
+compression	max_file_size	write_buffer_size	max_open_files
+ NoCompress	          4MB	              4MB	         50000
+
+
+---------------------READ STATISTICS-----------------------------------------
+type   		count		min		ave		max
+
+Options used in leveldb
+compression	max_file_size	write_buffer_size	max_open_files
+ NoCompress	          4MB	              4MB	         50000
+fillrandom   :      34.521 micros/op;    4.0 MB/s
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        7       23      1279        0    119521
+  1       12       41      2424   201379    200393
+  2       73      203      6253   556355    555627
+  3      762     2000      7525   704744    702897
+  4     5786    19998      6760   652630    641518
+  5    17513    70296      1554   148118    135831
+
+readrandom   :     378.769 micros/op; (100000 of 838860800 found)
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        0        0      1279        0    119524
+  1        6       17      2425   201422    200435
+  2       69      193      6255   556531    555803
+  3      728     1964      7528   704967    703120
+  4     5701    19649      6770   653447    642324
+  5    17576    70535      1569   149470    136990
+
+readrandom   :      24.228 micros/op; (100000 of 838860800 found)
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        0        0      1279        0    119524
+  1        6       17      2425   201422    200435
+  2       69      193      6255   556531    555803
+  3      726     1959      7528   704967    703120
+  4     5693    19614      6770   653501    642377
+  5    17582    70557      1571   149586    137087
+
+
+---------------------READ STATISTICS-----------------------------------------
+type   		count		min		ave		max
+2 time		191092		5		162.00		16487
+3 time		8386		14		201.50		12110
+4 time		444		21		246.32		14320
+5 time		64		29		260.33		2819
+6 time		9		39		171.11		433
+7 time		3		190		211.33		245
+8 time		2		18446744073709551615		144.00		193
+
