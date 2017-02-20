@@ -1,0 +1,69 @@
+
+filterPolicyName:leveldb.BuiltinBloomFilter2
+LevelDB:    version 1.19
+CPU:        4 * Intel(R) Core(TM) i5-4460  CPU @ 3.20GHz
+CPUCache:   6144 KB
+Keys:       16 bytes each
+Values:     128 bytes each (128 bytes after compression)
+Entries:    838860800
+RawSize:    115200.0 MB (estimated)
+FileSize:   115200.0 MB (estimated)
+WARNING: Snappy compression is not enabled
+------------------------------------------------
+Options used in leveldb
+compression	max_file_size	write_buffer_size	max_open_files
+ NoCompress	          4MB	              4MB	         50000
+
+
+---------------------READ STATISTICS-----------------------------------------
+type   		count		min		ave		max
+
+Options used in leveldb
+compression	max_file_size	write_buffer_size	max_open_files
+ NoCompress	          4MB	              4MB	         50000
+fillrandom   :      43.985 micros/op;    3.1 MB/s
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        4       13      1580        0    119321
+  1       15       50      2891   201928    200882
+  2       87      225      7741   545317    544577
+  3      884     2249     10295   696801    694829
+  4     6502    22496      8927   630027    618269
+  5    17090    68934      1765   128504    118666
+
+readrandom   :    2186.456 micros/op; (100000 of 838860800 found)
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        4       13      1580        0    119321
+  1        6       18      2891   201928    200882
+  2       70      196      7743   545469    544728
+  3      791     1992     10305   697344    695371
+  4     5790    19918      8960   631992    620192
+  5    17522    70561      1908   138036    126973
+
+readrandom   :    2396.703 micros/op; (100000 of 838860800 found)
+
+                               Compactions
+Level  Files Size(MB) Time(sec) Read(MB) Write(MB)
+--------------------------------------------------
+  0        4       13      1580        0    119321
+  1        5       14      2891   201928    200882
+  2       62      171      7744   545486    544745
+  3      704     1719     10309   697583    695610
+  4     5014    17206      8994   633763    621942
+  5    17959    72229      2079   148547    136158
+
+
+---------------------READ STATISTICS-----------------------------------------
+type   		count		min		ave		max
+2 time		166844		4		1937.73		752482
+3 time		29825		12		2854.71		702252
+4 time		2963		22		3514.60		671206
+5 time		311		33		3048.53		38668
+6 time		55		34		3574.00		26852
+7 time		2		18446744073709551615		303.00		441
+
