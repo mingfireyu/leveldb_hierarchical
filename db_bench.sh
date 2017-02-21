@@ -1,12 +1,13 @@
 #!/bin/bash
-totalsize=$(expr 1024 \* 1024 \* 1024 \* 100)
-#totalsize=$(expr 1024 \* 1024 \* 100)
-benchmarks=fillrandom,stats,readrandom,stats,readrandom,stats
+#totalsize=$(expr 1024 \* 1024 \* 1024 \* 100)
+totalsize=$(expr 1024 \* 1024 \* 100)
+#benchmarks=fillrandom,stats,readrandom,stats,readrandom,stats
+benchmarks=fillrandom,stats,fillrandom,stats
 value_size=128
 let num=totalsize/value_size
 bloom_bits=10
 log_open=1
-db=/root/DBStore
+db=~/DBStore
 open_files=50000
 # for i in `seq 1 3`;
 # do 

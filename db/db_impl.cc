@@ -12,7 +12,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
-#include <boost/iterator/iterator_concepts.hpp>
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
@@ -1542,7 +1541,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
-    snprintf(buf, sizeof(buf),
+  /*  snprintf(buf, sizeof(buf),
              "                               Compactions\n"
              "Level  Files Size(B) \n"
              "--------------------------------------------------\n"
@@ -1559,7 +1558,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
             (unsigned long long)versions_->NumLevelBytes(level) );
         value->append(buf);
       }
-    }
+    }*/
     
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
