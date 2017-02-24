@@ -1,7 +1,9 @@
 #!/bin/bash
+sync; echo 3 > /proc/sys/vm/drop_caches 
 totalsize=$(expr 1024 \* 1024 \* 1024 \* 100)
-#totalsize=$(expr 1024 \* 1024 \* 100)
+#totalsize=$(expr 1024 \* 1024 \* 1024)
 benchmarks=fillrandom,stats,readrandom,stats,readrandom,stats
+#benchmarks=fillrandom,stats,fillrandom,stats
 value_size=128
 let num=totalsize/value_size
 bloom_bits=10

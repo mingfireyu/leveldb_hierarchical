@@ -12,7 +12,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
-#include <boost/iterator/iterator_concepts.hpp>
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
