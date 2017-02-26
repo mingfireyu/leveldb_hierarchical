@@ -11,7 +11,8 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
-
+#include<stdio.h>
+#include <boost/concept_check.hpp>
 namespace leveldb {
 
 Status BuildTable(const std::string& dbname,
@@ -61,14 +62,23 @@ Status BuildTable(const std::string& dbname,
     }
     delete file;
     file = NULL;
-
+    
     if (s.ok()) {
       // Verify that the table is usable
+      //size_t beforeUsage = table_cache->TotalCharge();
       Iterator* it = table_cache->NewIterator(ReadOptions(),
                                               meta->number,
                                               meta->file_size);
       s = it->status();
       delete it;
+      /*size_t afterUsage = table_cache->TotalCharge();
+      if(afterUsage <= beforeUsage){
+	printf("seems no change\n");
+      }else{
+	printf("changed\n");
+      }
+      printf("beforeUsage:%lu,afterUsage:%lu \n",beforeUsage,afterUsage);
+      */
     }
   }
 

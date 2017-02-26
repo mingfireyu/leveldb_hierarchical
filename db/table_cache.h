@@ -21,6 +21,8 @@ class Env;
 class TableCache {
  public:
   TableCache(const std::string& dbname, const Options* options, int entries);
+  size_t TotalCharge() const;
+  
   ~TableCache();
 
   // Return an iterator for the specified file number (the corresponding
