@@ -18,6 +18,7 @@
 #include "util/random.h"
 #include "util/testutil.h"
 #include <iostream>
+#include<unistd.h>
 // Comma-separated list of operations to run in the specified order
 //   Actual benchmarks:
 //      fillseq       -- write N values in sequential key order in async mode
@@ -59,6 +60,7 @@ static const char* FLAGS_benchmarks =
     "snappycomp,"
     "snappyuncomp,"
     "acquireload,"
+    "untilCompactionEnds,"
     ;
 
 // Number of key/values to place in database
@@ -496,7 +498,9 @@ class Benchmark {
         method = &Benchmark::ReadReverse;
       } else if (name == Slice("readrandom")) {
         method = &Benchmark::ReadRandom;
-      } else if (name == Slice("readmissing")) {
+      }else if (name == Slice("untilCompactionEnds")){
+	method = &Benchmark::untilCompactionEnds;
+      }else if (name == Slice("readmissing")) {
         method = &Benchmark::ReadMissing;
       } else if (name == Slice("seekrandom")) {
         method = &Benchmark::SeekRandom;
@@ -831,6 +835,27 @@ class Benchmark {
     thread->stats.AddMessage(msg);
   }
 
+  void untilCompactionEnds(ThreadState *thread){
+      std::string preValue,afterValue;
+      int count = 0;
+      const int countMAX = 20;
+      db_->GetProperty("leveldb.num-files-at-level1",&afterValue);
+     // std::cout<<afterValue<<std::endl;
+      //std::cout<<preValue<<std::endl;
+      while(preValue.compare(afterValue) != 0 && count < countMAX){
+	preValue = afterValue;
+	sleep(30);
+	db_->GetProperty("leveldb.num-files-at-level1",&afterValue);
+	count++;
+      }
+      if(count == countMAX){
+	fprintf(stderr,"Compaction is still running!\n");
+      }else{
+	fprintf(stderr,"no compaction!\n");
+      }
+      
+  }
+  
   void ReadMissing(ThreadState* thread) {
     ReadOptions options;
     std::string value;

@@ -1542,7 +1542,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
-    snprintf(buf, sizeof(buf),
+   /* snprintf(buf, sizeof(buf),
              "                               Compactions\n"
              "Level  Files Size(B) \n"
              "--------------------------------------------------\n"
@@ -1560,7 +1560,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
-    
+    */
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
     return true;
