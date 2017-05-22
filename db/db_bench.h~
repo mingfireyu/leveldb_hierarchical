@@ -1,0 +1,12 @@
+
+class RandomGenerator {
+ private:
+  std::string data_;
+  int pos_;
+
+ public:
+  RandomGenerator();
+
+
+  Slice Generate(size_t len) ;
+};

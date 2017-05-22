@@ -7,29 +7,47 @@
 #include "leveldb/slice.h"
 #include "util/hash.h"
 #include <db/dbformat.h>
-
+#include<stdio.h>
+#include<stdlib.h>
 namespace leveldb {
 
 namespace {
 static uint32_t BloomHash(const Slice& key) {
   return Hash(key.data(), key.size(), 0xbc9f1d34);
 }
-  static size_t bits[] = {31,30,27,28,18,9,9};
+static size_t bits[] = {31,30,27,28,18,9,9};
 class BloomFilterPolicy : public FilterPolicy {
  private:
   size_t bits_per_key_[config::kNumLevels];
   size_t k_[config::kNumLevels];
   
  public:
-  explicit BloomFilterPolicy(int bits_per_key){
+  explicit BloomFilterPolicy(int bits_per_key,const char *filename){
     // We intentionally round down to reduce probing cost a little bit
+    FILE *fp = fopen(filename,"r");
+    unsigned int j = 0;
+    while(fscanf(fp,"%lu",&bits[j++])!=EOF);
+    while( j < 7){
+	bits[j++] = 1;
+    }
     for(unsigned int i = 0 ; i < config::kNumLevels ; i++){
-      bits_per_key_[i] = bits[i];
+      if(i == 0){
+	    bits_per_key_[i] = bits[i];
+      }else if(i <= 5 ){
+	    bits_per_key_[i] = bits[1];
+      }else{
+	    bits_per_key_[i] = bits[config::numSpecialLevels + (i-6)/10];
+      }
       k_[i]= static_cast<size_t>(bits_per_key_[i] * 0.69);  // 0.69 =~ ln(2)
     
       if (k_[i] < 1) k_[i] = 1;
       if (k_[i] > 30) k_[i] = 30;
     }
+    printf("\n");
+    for(unsigned int i = 0 ; i < config::kNumLevels ; i++){
+	printf("%d:%lu ",i,bits_per_key_[i]);
+    }
+    printf("\n");
   }
 
   virtual const char* Name() const {
@@ -92,8 +110,8 @@ class BloomFilterPolicy : public FilterPolicy {
 };
 }
 
-const FilterPolicy* NewBloomFilterPolicy(int bits_per_key) {
-  return new BloomFilterPolicy(bits_per_key);
+const FilterPolicy* NewBloomFilterPolicy(int bits_per_key,const char *filename) {
+  return new BloomFilterPolicy(bits_per_key,filename);
 }
 
 }  // namespace leveldb

@@ -513,7 +513,7 @@ leveldb_filterpolicy_t* leveldb_filterpolicy_create_bloom(int bits_per_key) {
     static void DoNothing(void*) { }
   };
   Wrapper* wrapper = new Wrapper;
-  wrapper->rep_ = NewBloomFilterPolicy(bits_per_key);
+  wrapper->rep_ = NewBloomFilterPolicy(bits_per_key,"/home/ming/bloom.txt");
   wrapper->state_ = NULL;
   wrapper->destructor_ = &Wrapper::DoNothing;
   return wrapper;
