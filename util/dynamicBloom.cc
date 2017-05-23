@@ -110,9 +110,9 @@ class BloomFilterPolicy : public FilterPolicy {
 };
 }
 
-const FilterPolicy* NewBloomFilterPolicy(void *strFilename) {
+/*const FilterPolicy* NewBloomFilterPolicy(void *strFilename) {
   char *filename = static_cast<char*>(strFilename);
   return new BloomFilterPolicy(filename);
-}
+}*/
 
 }  // namespace leveldb
