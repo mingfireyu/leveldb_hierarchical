@@ -170,11 +170,12 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
 
   versions_ = new VersionSet(dbname_, &options_, table_cache_,
                              &internal_comparator_);
-  printf("glsm --- hierarchical bloom filter");
+  printf("glsm --- static bloom filter\n");
 }
 
 DBImpl::~DBImpl() {
   // Wait for background work to finish
+  untilCompactionEnds();
   mutex_.Lock();
   shutting_down_.Release_Store(this);  // Any non-NULL value is ok
   unsigned long long timeSum = 0;
@@ -1610,6 +1611,27 @@ void DBImpl::GetApproximateSizes(
     MutexLock l(&mutex_);
     v->Unref();
   }
+}
+
+void DBImpl::untilCompactionEnds()
+{
+     std::string preValue,afterValue;
+      int count = 0;
+      const int countMAX = 30;
+      this->GetProperty("leveldb.num-files-at-level1",&afterValue);
+     // std::cout<<afterValue<<std::endl;
+      //std::cout<<preValue<<std::endl;
+      while(preValue.compare(afterValue) != 0 && count < countMAX){
+	preValue = afterValue;
+	sleep(30);
+	this->GetProperty("leveldb.num-files-at-level1",&afterValue);
+	count++;
+      }
+      if(count == countMAX){
+	fprintf(stderr,"Compaction is still running!\n");
+      }else{
+	fprintf(stderr,"no compaction!\n");
+      }
 }
 
 // Default implementations of convenience methods that subclasses of DB
