@@ -24,6 +24,7 @@ class BloomFilterPolicy : public FilterPolicy {
  public:
   explicit BloomFilterPolicy(const char *filename){
     // We intentionally round down to reduce probing cost a little bit
+    printf("filter policy name:%s \n",Name());
     FILE *fp = fopen(filename,"r");
     unsigned int j = 0;
     while(fscanf(fp,"%lu",&bits[j++])!=EOF);
@@ -43,11 +44,11 @@ class BloomFilterPolicy : public FilterPolicy {
       if (k_[i] < 1) k_[i] = 1;
       if (k_[i] > 30) k_[i] = 30;
     }
-    printf("\n");
+  /*  printf("\n");
     for(unsigned int i = 0 ; i < config::kNumLevels ; i++){
 	printf("%d:%lu ",i,bits_per_key_[i]);
     }
-    printf("\n");
+    printf("\n");*/
   }
 
   virtual const char* Name() const {
