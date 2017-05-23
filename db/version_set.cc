@@ -616,6 +616,21 @@ std::string Version::DebugString() const {
   return r;
 }
 
+void Version::findAllTable(TableCache* table_cache)
+{
+    for (int level = 0; level < config::kNumLevels; level++){
+	   size_t num_files = files_[level].size();
+	   if(num_files == 0){
+		continue;
+	    }
+	    for(int i = 0 ; i < num_files ; i++){
+		auto iter = table_cache->NewIterator(ReadOptions(), files_[level][i]->number, files_[level][i]->file_size);
+		delete iter;
+	    }
+     }          
+}
+
+
 // A helper class so we can efficiently apply a whole sequence
 // of edits to a particular state without creating intermediate
 // Versions that contain full copies of the intermediate state.
@@ -1464,6 +1479,14 @@ Compaction* VersionSet::CompactRange(
   SetupOtherInputs(c);
   return c;
 }
+
+void VersionSet::findAllTable()
+{
+    current_->Ref();
+    current_->findAllTable(table_cache_);
+    current_->Unref();
+}
+
 
 Compaction::Compaction(const Options* options, int level)
     : level_(level),

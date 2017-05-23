@@ -410,7 +410,7 @@ class Benchmark {
   Benchmark()
   : cache_(FLAGS_cache_size >= 0 ? NewLRUCache(FLAGS_cache_size) : NULL),
     filter_policy_(FLAGS_bloom_bits >= 0
-                   ? NewBloomFilterPolicy(FLAGS_bloom_bits,FLAGS_bloom_filter_name)
+                   ? NewBloomFilterPolicy(NULL)
                    : NULL),
     db_(NULL),
     num_(FLAGS_num),

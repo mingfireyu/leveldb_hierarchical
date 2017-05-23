@@ -41,7 +41,7 @@ enum READ_STATISTICS{
   IMEM_READ,
   MEM_LENGTH
 };
-static const unsigned int READMAXTIME=18;
+static const unsigned int READMAXTIME=70;
 
 extern STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 namespace leveldb {

@@ -170,6 +170,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
 
   versions_ = new VersionSet(dbname_, &options_, table_cache_,
                              &internal_comparator_);
+  printf("glsm --- hierarchical bloom filter");
 }
 
 DBImpl::~DBImpl() {
@@ -215,7 +216,7 @@ DBImpl::~DBImpl() {
       if(i == MEM_READ || i == IMEM_READ){
 	printf("%4s\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",readMemString[i],readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
       }else{
-	printf("%u time\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",i-IMEM_READ,readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
+	printf("%u time\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",i-IMEM_READ-1,readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
       }
     }
   }
@@ -1670,6 +1671,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
   impl->mutex_.Unlock();
   if (s.ok()) {
     assert(impl->mem_ != NULL);
+    impl->versions_->findAllTable();
     *dbptr = impl;
   } else {
     delete impl;

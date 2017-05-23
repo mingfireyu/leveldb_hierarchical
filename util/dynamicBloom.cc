@@ -22,7 +22,7 @@ class BloomFilterPolicy : public FilterPolicy {
   size_t k_[config::kNumLevels];
   
  public:
-  explicit BloomFilterPolicy(int bits_per_key,const char *filename){
+  explicit BloomFilterPolicy(const char *filename){
     // We intentionally round down to reduce probing cost a little bit
     FILE *fp = fopen(filename,"r");
     unsigned int j = 0;
@@ -110,8 +110,9 @@ class BloomFilterPolicy : public FilterPolicy {
 };
 }
 
-const FilterPolicy* NewBloomFilterPolicy(int bits_per_key,const char *filename) {
-  return new BloomFilterPolicy(bits_per_key,filename);
+const FilterPolicy* NewBloomFilterPolicy(void *strFilename) {
+  char *filename = static_cast<char*>(strFilename);
+  return new BloomFilterPolicy(filename);
 }
 
 }  // namespace leveldb

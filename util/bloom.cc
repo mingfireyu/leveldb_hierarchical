@@ -89,7 +89,8 @@ class BloomFilterPolicy : public FilterPolicy {
 };
 }
 
-/*const FilterPolicy* NewBloomFilterPolicy(int bits_per_key) {
+/*const FilterPolicy* NewBloomFilterPolicy(void* intBits_per_key) {
+  int bits_per_key = static_cast<int*>(intBits_per_key);
   return new BloomFilterPolicy(bits_per_key);
 }*/
 
