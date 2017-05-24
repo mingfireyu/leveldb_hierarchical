@@ -175,6 +175,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
 
 DBImpl::~DBImpl() {
   // Wait for background work to finish
+  untilCompactionEnds();
   mutex_.Lock();
   shutting_down_.Release_Store(this);  // Any non-NULL value is ok
   unsigned long long timeSum = 0;
