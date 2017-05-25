@@ -1582,6 +1582,13 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
              static_cast<unsigned long long>(total_usage));
     value->append(buf);
     return true;
+  } else if(in == "num-files"){
+      for(int level = 0  ; level < config::kNumLevels ; level++){
+	    char buf[100];
+	    snprintf(buf, sizeof(buf), "%d",versions_->NumLevelFiles(static_cast<int>(level)));
+	    value->append(buf);
+      }
+      return true;
   }
 
   return false;
@@ -1617,13 +1624,13 @@ void DBImpl::untilCompactionEnds()
       std::string preValue,afterValue;
       int count = 0;
       const int countMAX = 30;
-      this->GetProperty("leveldb.num-files-at-level1",&afterValue);
+      this->GetProperty("leveldb.num-files",&afterValue);
    // std::cout<<afterValue<<std::endl;
       //std::cout<<preValue<<std::endl;
      while(preValue.compare(afterValue) != 0 && count < countMAX){
 	    preValue = afterValue;
 	    sleep(30);
-	    this->GetProperty("leveldb.num-files-at-level1",&afterValue);
+	    this->GetProperty("leveldb.num-files",&afterValue);
 	    count++;
       }
       if(count == countMAX){
@@ -1631,6 +1638,10 @@ void DBImpl::untilCompactionEnds()
        }else{
 	    fprintf(stderr,"no compaction!\n");
        }
+       std::string stat_str;
+       this->GetProperty("leveldb.stats",&stat_str);
+       stat_str.append("\n--------------abover are untilCompactionEnds output--------------\n");
+	std::cout<<stat_str<<std::endl;
  }
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
