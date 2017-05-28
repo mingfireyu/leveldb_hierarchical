@@ -170,10 +170,12 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
 
   versions_ = new VersionSet(dbname_, &options_, table_cache_,
                              &internal_comparator_);
+  printf("lsm --- hierarchical bloom filter \n");
 }
 
 DBImpl::~DBImpl() {
   // Wait for background work to finish
+  untilCompactionEnds();
   mutex_.Lock();
   shutting_down_.Release_Store(this);  // Any non-NULL value is ok
   unsigned long long timeSum = 0;
@@ -215,7 +217,7 @@ DBImpl::~DBImpl() {
       if(i == MEM_READ || i == IMEM_READ){
 	printf("%4s\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",readMemString[i],readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
       }else{
-	printf("%u time\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",i-IMEM_READ,readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
+	printf("%u time\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",i-IMEM_READ-1,readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
       }
     }
   }
@@ -1580,6 +1582,13 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
              static_cast<unsigned long long>(total_usage));
     value->append(buf);
     return true;
+  }else if( in == "num-files"){
+	for(int level = 0  ; level < config::kNumLevels ; level++){
+ 	    char buf[100];
+ 	    snprintf(buf, sizeof(buf), "%d",versions_->NumLevelFiles(static_cast<int>(level)));
+ 	    value->append(buf);
+       }
+       return true;
   }
 
   return false;
@@ -1611,6 +1620,31 @@ void DBImpl::GetApproximateSizes(
   }
 }
 
+void DBImpl::untilCompactionEnds()
+{
+        std::string preValue,afterValue;
+        int count = 0;
+        const int countMAX = 30;
+	this->GetProperty("leveldb.num-files",&afterValue);
+     // std::cout<<afterValue<<std::endl;
+        //std::cout<<preValue<<std::endl;
+	while(preValue.compare(afterValue) != 0 && count < countMAX){
+		preValue = afterValue;
+		sleep(30);
+		this->GetProperty("leveldb.num-files",&afterValue);
+		count++;
+        }
+        if(count == countMAX){
+  	    fprintf(stderr,"Compaction is still running!\n");
+         }else{
+  	    fprintf(stderr,"no compaction!\n");
+         }
+	std::string stat_str;
+	this->GetProperty("leveldb.stats",&stat_str);
+	stat_str.append("\n--------------above are untilCompactionEnds output--------------\n");
+	std::cout<<stat_str<<std::endl;
+}
+   
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
@@ -1670,6 +1704,9 @@ Status DB::Open(const Options& options, const std::string& dbname,
   impl->mutex_.Unlock();
   if (s.ok()) {
     assert(impl->mem_ != NULL);
+    impl->mutex_.Lock();
+    impl->versions_->findAllTable();
+    impl->mutex_.Unlock();
     *dbptr = impl;
   } else {
     delete impl;

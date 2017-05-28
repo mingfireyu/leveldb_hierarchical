@@ -112,7 +112,7 @@ class Version {
 
   // Return a human readable string that describes this version's contents.
   std::string DebugString() const;
-
+  void findAllTable(TableCache *table_cache);
  private:
   friend class Compaction;
   friend class VersionSet;
@@ -267,7 +267,7 @@ class VersionSet {
     char buffer[100];
   };
   const char* LevelSummary(LevelSummaryStorage* scratch) const;
-
+  void findAllTable();
  private:
   class Builder;
 

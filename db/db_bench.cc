@@ -119,6 +119,7 @@ static const char* FLAGS_db = NULL;
 static bool FLAGS_log_open = true;
 
 static bool FLAGS_compression_open = false;
+static char FLAGS_bloom_filter_name[50] = "/home/ming/bloom.txt";
 namespace leveldb {
 
 namespace {
@@ -410,7 +411,7 @@ class Benchmark {
   Benchmark()
   : cache_(FLAGS_cache_size >= 0 ? NewLRUCache(FLAGS_cache_size) : NULL),
     filter_policy_(FLAGS_bloom_bits >= 0
-                   ? NewBloomFilterPolicy(FLAGS_bloom_bits)
+                   ? NewBloomFilterPolicy((void*)FLAGS_bloom_filter_name)
                    : NULL),
     db_(NULL),
     num_(FLAGS_num),
