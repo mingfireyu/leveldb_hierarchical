@@ -553,7 +553,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
       (unsigned long long) meta.number);
   
    int level1 = 0;
-  // iter->SeekToFirst();
+   iter->SeekToFirst();
    if(iter->Valid()){
       iter->SeekToFirst();                   
       meta.smallest.DecodeFrom(iter->key());
@@ -1623,7 +1623,7 @@ void DBImpl::untilCompactionEnds()
  {
       std::string preValue,afterValue;
       int count = 0;
-      const int countMAX = 30;
+      const int countMAX = 240;
       this->GetProperty("leveldb.num-files",&afterValue);
    // std::cout<<afterValue<<std::endl;
       //std::cout<<preValue<<std::endl;
