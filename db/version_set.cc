@@ -20,6 +20,7 @@
 #include<sys/time.h>
 #include<unistd.h>
 extern unsigned long long trivialMoveCount;
+extern unsigned long long bloomFilterCompareCount;
 namespace leveldb {
 
 static int TargetFileSize(const Options* options) {
