@@ -1566,6 +1566,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     }
     */
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
+    value->append(buf);
     snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu \n",bloomFilterCompareCount);
     value->append(buf);
     return true;
