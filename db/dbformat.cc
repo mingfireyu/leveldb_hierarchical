@@ -111,7 +111,7 @@ void InternalFilterPolicy::CreateFilter(const Slice* keys, int n,
     mkey[i] = ExtractUserKey(keys[i]);
     // TODO(sanjay): Suppress dups?
   }
-  user_policy_->CreateFilter(keys, n, dst);
+  user_policy_->CreateFilter(keys, n, dst,level);
 }
 
 bool InternalFilterPolicy::KeyMayMatch(const Slice& key, const Slice& f) const {
