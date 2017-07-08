@@ -28,6 +28,10 @@ extern unsigned long long totalWriteCount;*/
 
 
 namespace leveldb {
+bool direct_IO_flag_ ;
+void setDirectIOFlag(bool flag){
+  direct_IO_flag_ = flag;
+}
 inline size_t TruncateToPageBoundary(size_t page_size, size_t s) {
   s -= (s & (page_size - 1));
   assert((s % page_size) == 0);
@@ -81,7 +85,7 @@ public:
 	memcpy(dest,bufstart_+offset,read_size);
   }
 };
-bool RandomAccessFile::direct_IO_flag_ = true;
+
 namespace {
 
 static Status IOError(const std::string& context, int err_number) {
@@ -137,7 +141,12 @@ class PosixRandomAccessFile: public RandomAccessFile {
                       char* scratch) const {
     Status s;
     ssize_t r;
-    if(direct_IO_flag_){
+    static bool firstflag = true;
+    if(leveldb::direct_IO_flag_){
+      if(firstflag){
+	fprintf(stderr,"directIO!\n");
+	firstflag = false;
+      }
 	size_t alignment = abuf_->alignment_;
 	size_t aligned_offset = TruncateToPageBoundary(alignment, offset);
 	size_t offset_advance = offset - aligned_offset;
@@ -149,6 +158,10 @@ class PosixRandomAccessFile: public RandomAccessFile {
 	r = pread(fd_, abuf_->bufstart_, read_size, static_cast<off_t>(aligned_offset));
 	abuf_->Read(scratch,offset_advance,n);
     }else{
+      if(firstflag){
+	fprintf(stderr,"buffered io!\n");
+	firstflag = false;
+      }
 	r = pread(fd_, scratch, n, static_cast<off_t>(offset));
     }
     *result = Slice(scratch, (r < 0) ? 0 : n);
@@ -387,7 +400,7 @@ class PosixEnv : public Env {
     *result = NULL;
     Status s;
     int fd;
-    if(RandomAccessFile::direct_IO_flag_){
+    if(leveldb::direct_IO_flag_){
 	fd = open(fname.c_str(), O_RDONLY|O_DIRECT);
     }else{
 	fd = open(fname.c_str(), O_RDONLY);
