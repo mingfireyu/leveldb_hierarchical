@@ -239,11 +239,12 @@ class RandomAccessFile {
   // Safe for concurrent use by multiple threads.
   virtual Status Read(uint64_t offset, size_t n, Slice* result,
                       char* scratch) const = 0;
-
+   static bool direct_IO_flag_;
  private:
   // No copying allowed
   RandomAccessFile(const RandomAccessFile&);
   void operator=(const RandomAccessFile&);
+  
 };
 
 // A file abstraction for sequential writing.  The implementation

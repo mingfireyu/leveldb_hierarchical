@@ -25,8 +25,63 @@
 #include "util/posix_logger.h"
 /*extern unsigned long long totalBytesWrite;
 extern unsigned long long totalWriteCount;*/
-namespace leveldb {
 
+
+namespace leveldb {
+inline size_t TruncateToPageBoundary(size_t page_size, size_t s) {
+  s -= (s & (page_size - 1));
+  assert((s % page_size) == 0);
+  return s;
+}
+
+inline size_t Roundup(size_t x, size_t y) {
+  return ((x + y - 1) / y) * y;
+}
+class AlignedBuffer{
+public:
+    size_t capacity_;
+    size_t cursize_;
+    size_t alignment_;
+    char* bufstart_;
+    AlignedBuffer(size_t alignment)
+    : alignment_(alignment),
+      capacity_(0),
+      cursize_(0),
+      bufstart_(NULL) {
+   }
+   void Alignment(size_t alignment) {
+	assert(alignment > 0);
+	assert((alignment & (alignment - 1)) == 0);
+	alignment_ = alignment;
+   }
+   void AllocateNewBuffer(size_t requested_capacity, bool copy_data = false) {
+    void *new_buf;
+    assert(alignment_ > 0);
+    assert((alignment_ & (alignment_ - 1)) == 0);
+    if (copy_data && requested_capacity < cursize_) {
+      // If we are downsizing to a capacity that is smaller than the current
+      // data in the buffer. Ignore the request.
+      return;
+    }
+
+    size_t new_capacity = Roundup(requested_capacity, alignment_);
+    int ret = posix_memalign(&new_buf, alignment_, new_capacity);
+    char* new_bufstart = (char*)new_buf;
+    if (copy_data) {
+      memcpy(new_bufstart, bufstart_, cursize_);
+    } else {
+      cursize_ = 0;
+    }
+
+    bufstart_ = new_bufstart;
+    capacity_ = new_capacity;
+  }
+  
+  inline void Read(char *dest,size_t offset, size_t read_size){
+	memcpy(dest,bufstart_+offset,read_size);
+  }
+};
+bool RandomAccessFile::direct_IO_flag_ = true;
 namespace {
 
 static Status IOError(const std::string& context, int err_number) {
@@ -66,22 +121,37 @@ class PosixSequentialFile: public SequentialFile {
   }
 };
 
+
 // pread() based random-access
 class PosixRandomAccessFile: public RandomAccessFile {
  private:
   std::string filename_;
   int fd_;
-
+  AlignedBuffer *abuf_;
  public:
   PosixRandomAccessFile(const std::string& fname, int fd)
-      : filename_(fname), fd_(fd) { }
+      : filename_(fname), fd_(fd),abuf_(new AlignedBuffer(4096)) { }
   virtual ~PosixRandomAccessFile() { close(fd_); }
 
   virtual Status Read(uint64_t offset, size_t n, Slice* result,
                       char* scratch) const {
     Status s;
-    ssize_t r = pread(fd_, scratch, n, static_cast<off_t>(offset));
-    *result = Slice(scratch, (r < 0) ? 0 : r);
+    ssize_t r;
+    if(direct_IO_flag_){
+	size_t alignment = abuf_->alignment_;
+	size_t aligned_offset = TruncateToPageBoundary(alignment, offset);
+	size_t offset_advance = offset - aligned_offset;
+	size_t read_size = Roundup(offset + n, alignment) - aligned_offset;
+	if(read_size > abuf_->capacity_){
+	    abuf_->AllocateNewBuffer(read_size);
+	}
+	//printf("read_size:%ld , aligned_offset:%ld , buf capacity:%ld \n",read_size,aligned_offset,abuf_->capacity_);
+	r = pread(fd_, abuf_->bufstart_, read_size, static_cast<off_t>(aligned_offset));
+	abuf_->Read(scratch,offset_advance,n);
+    }else{
+	r = pread(fd_, scratch, n, static_cast<off_t>(offset));
+    }
+    *result = Slice(scratch, (r < 0) ? 0 : n);
     if (r < 0) {
       // An error: return a non-ok status
       s = IOError(filename_, errno);
@@ -316,7 +386,12 @@ class PosixEnv : public Env {
                                      RandomAccessFile** result) {
     *result = NULL;
     Status s;
-    int fd = open(fname.c_str(), O_RDONLY);
+    int fd;
+    if(RandomAccessFile::direct_IO_flag_){
+	fd = open(fname.c_str(), O_RDONLY|O_DIRECT);
+    }else{
+	fd = open(fname.c_str(), O_RDONLY);
+    }
     if (fd < 0) {
       s = IOError(fname, errno);
     } else if (false&&mmap_limit_.Acquire()) {
