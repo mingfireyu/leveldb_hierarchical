@@ -19,7 +19,8 @@
 #include "util/logging.h"
 #include<sys/time.h>
 #include<unistd.h>
-
+extern unsigned long long trivialMoveCount;
+extern unsigned long long bloomFilterCompareCount;
 namespace leveldb {
 
 static int TargetFileSize(const Options* options) {
@@ -439,7 +440,7 @@ Status Version::Get(const ReadOptions& options,
       }
     }
   }
-
+  readFileTimeProcess(start_time,options.readFilenum);
   return Status::NotFound(Slice());  // Use an empty error message for speed
 }
 
@@ -1505,9 +1506,14 @@ bool Compaction::IsTrivialMove() const {
   // Avoid a move if there is lots of overlapping grandparent data.
   // Otherwise, the move could create a parent file that will require
   // a very expensive merge later on.
-  return (num_input_files(0) == 1 && num_input_files(1) == 0 &&
+  
+  
+  if(num_input_files(0) == 1 && num_input_files(1) == 0 &&
           TotalFileSize(grandparents_) <=
-              MaxGrandParentOverlapBytes(vset->options_));
+     MaxGrandParentOverlapBytes(vset->options_)){
+    trivialMoveCount++;
+  }
+  return false;
 }
 
 void Compaction::AddInputDeletions(VersionEdit* edit) {

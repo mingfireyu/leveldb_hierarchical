@@ -14,7 +14,8 @@
 #include "table/format.h"
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
-
+extern unsigned long long bloomFilterCompareCount;
+extern unsigned long long readTableCount;
 namespace leveldb {
 
 struct Table::Rep {
@@ -233,10 +234,12 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k,
     Slice handle_value = iiter->value();
     FilterBlockReader* filter = rep_->filter;
     BlockHandle handle;
+    readTableCount++;
     if (filter != NULL &&
         handle.DecodeFrom(&handle_value).ok() &&
         !filter->KeyMayMatch(handle.offset(), k)) {
       // Not found
+      bloomFilterCompareCount++;
     } else {
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);

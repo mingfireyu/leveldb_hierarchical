@@ -42,6 +42,8 @@ unsigned long long immetableWrites;
 unsigned long long wait_count;
 unsigned long long compactionCount;   //BackGroud compaction
 unsigned long long trivialMoveCount;
+unsigned long long bloomFilterCompareCount;
+unsigned long long readTableCount;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -157,6 +159,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   has_imm_.Release_Store(NULL);
   compactionCount = 0;
   trivialMoveCount = 0;
+  bloomFilterCompareCount = 0;
+  readTableCount = 0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -553,7 +557,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
       (unsigned long long) meta.number);
   
    int level1 = 0;
-  // iter->SeekToFirst();
+   iter->SeekToFirst();
    if(iter->Valid()){
       iter->SeekToFirst();                   
       meta.smallest.DecodeFrom(iter->key());
@@ -1565,6 +1569,8 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     */
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
+    snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu readTableCount:%llu \n",bloomFilterCompareCount,readTableCount);
+    value->append(buf);
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();
@@ -1624,7 +1630,11 @@ void DBImpl::untilCompactionEnds()
 {
         std::string preValue,afterValue;
         int count = 0;
-        const int countMAX = 240;
+
+
+
+        const int countMAX = 2400;
+
 	this->GetProperty("leveldb.num-files",&afterValue);
      // std::cout<<afterValue<<std::endl;
         //std::cout<<preValue<<std::endl;
