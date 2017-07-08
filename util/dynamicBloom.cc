@@ -51,7 +51,9 @@ class BloomFilterPolicy : public FilterPolicy {
   virtual void CreateFilter(const Slice* keys, int n, std::string* dst,int level) const {
     // Compute bloom filter size (in both bits and bytes)
     size_t bits = n * bits_per_key_[level];
-
+    if(level >= 0){
+      printf("level%d:%lu ",level,bits_per_key_[level]);
+    }
     // For small n, we can see a very high false positive rate.  Fix it
     // by enforcing a minimum bloom filter length.
     if (bits < 64) bits = 64;

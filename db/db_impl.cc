@@ -557,7 +557,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
       (unsigned long long) meta.number);
   
    int level1 = 0;
-  // iter->SeekToFirst();
+   iter->SeekToFirst();
    if(iter->Valid()){
       iter->SeekToFirst();                   
       meta.smallest.DecodeFrom(iter->key());
