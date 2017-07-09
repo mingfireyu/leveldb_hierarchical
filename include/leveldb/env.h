@@ -52,7 +52,8 @@ class RandomAccessFile;
 class SequentialFile;
 class Slice;
 class WritableFile;
-
+extern bool direct_IO_flag_;
+void setDirectIOFlag(bool flag);
 class Env {
  public:
   Env() { }
