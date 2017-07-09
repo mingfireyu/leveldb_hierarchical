@@ -443,7 +443,7 @@ Status Version::Get(const ReadOptions& options,
       }
     }
   }
-
+  readFileTimeProcess(start_time,options.readFilenum);
   return Status::NotFound(Slice());  // Use an empty error message for speed
 }
 
