@@ -19,6 +19,8 @@
 #include "util/logging.h"
 #include<sys/time.h>
 #include<unistd.h>
+extern unsigned long long notFoundDiskAccessCount;
+extern unsigned long long foundDiskAccessCount;
 
 namespace leveldb {
 
@@ -335,13 +337,18 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key,
   }
 }
 unsigned long long  timeAddTo(struct timeval &begin_time,unsigned long long &timeSum);
-void readFileTimeProcess(struct timeval &start_time,unsigned int num){
+void readFileTimeProcess(struct timeval &start_time,unsigned int num,bool found){
   unsigned long long diff = timeAddTo(start_time,readSums[MEM_LENGTH+num].ave);
   readSums[MEM_LENGTH+num].count++;
   if(diff > readSums[MEM_LENGTH+num].max){
     readSums[MEM_LENGTH+num].max = diff;
   }else if(diff < readSums[MEM_LENGTH+num].min){
     readSums[MEM_LENGTH+num].min = diff;
+  }
+  if(found){
+    foundDiskAccessCount += num;
+  }else{
+    notFoundDiskAccessCount += num;
   }
 }
 
@@ -431,10 +438,10 @@ Status Version::Get(const ReadOptions& options,
         case kNotFound:
           break;      // Keep searching in other files
         case kFound:
-	  readFileTimeProcess(start_time,options.readFilenum);
+	  readFileTimeProcess(start_time,options.readFilenum,true);
           return s;
         case kDeleted:
-	  readFileTimeProcess(start_time,options.readFilenum);
+	  readFileTimeProcess(start_time,options.readFilenum,false);
           s = Status::NotFound(Slice());  // Use empty error message for speed
           return s;
         case kCorrupt:
@@ -443,7 +450,7 @@ Status Version::Get(const ReadOptions& options,
       }
     }
   }
-  readFileTimeProcess(start_time,options.readFilenum);
+  readFileTimeProcess(start_time,options.readFilenum,false);
   return Status::NotFound(Slice());  // Use an empty error message for speed
 }
 
