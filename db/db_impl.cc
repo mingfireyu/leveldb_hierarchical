@@ -44,6 +44,8 @@ unsigned long long compactionCount;   //BackGroud compaction
 unsigned long long trivialMoveCount;
 unsigned long long bloomFilterCompareCount;
 unsigned long long readTableCount;
+unsigned long long foundDiskAccessCount;
+unsigned long long notFoundDiskAccessCount;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -161,6 +163,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   trivialMoveCount = 0;
   bloomFilterCompareCount = 0;
   readTableCount = 0;
+  foundDiskAccessCount = 0;
+  notFoundDiskAccessCount = 0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -1570,6 +1574,8 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
     snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu readTableCount:%llu \n",bloomFilterCompareCount,readTableCount);
+    value->append(buf);
+    snprintf(buf,sizeof(buf),"\n found Count:%llu not Found Count:%llu \n",foundDiskAccessCount,notFoundDiskAccessCount);
     value->append(buf);
     return true;
   } else if (in == "sstables") {
