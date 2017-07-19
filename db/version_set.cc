@@ -344,9 +344,9 @@ void readFileTimeProcess(struct timeval &start_time,unsigned int num,bool found)
     readSums[MEM_LENGTH+num].min = diff;
   }
   if(found){
-    foundDiskAccessCount++;
+    foundDiskAccessCount += num;
   }else{
-    notFoundDiskAccessCount++;
+    notFoundDiskAccessCount += num;
   }
 }
 
