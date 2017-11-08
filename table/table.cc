@@ -16,10 +16,16 @@
 #include "util/coding.h"
 extern unsigned long long bloomFilterCompareCount;
 extern unsigned long long readTableCount;
+extern unsigned long long addFilterCount;
+extern unsigned long long addFilterTime;
+extern unsigned long long filterMemSpace;
+extern unsigned long long filterNum;
 namespace leveldb {
 
 struct Table::Rep {
   ~Rep() {
+     filterMemSpace -= filter_size;
+     filterNum--;
     delete filter;
     delete [] filter_data;
     delete index_block;
@@ -34,6 +40,7 @@ struct Table::Rep {
 
   BlockHandle metaindex_handle;  // Handle to metaindex_block: saved from footer
   Block* index_block;
+  size_t filter_size;
 };
 
 Status Table::Open(const Options& options,
@@ -41,6 +48,7 @@ Status Table::Open(const Options& options,
                    uint64_t size,
                    Table** table) {
   *table = NULL;
+ 
   if (size < Footer::kEncodedLength) {
     return Status::Corruption("file is too short to be an sstable");
   }
@@ -80,6 +88,7 @@ Status Table::Open(const Options& options,
     rep->cache_id = (options.block_cache ? options.block_cache->NewId() : 0);
     rep->filter_data = NULL;
     rep->filter = NULL;
+    rep->filter_size = 0;
     *table = new Table(rep);
     (*table)->ReadMeta(footer);
   } else {
@@ -132,11 +141,17 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
     opt.verify_checksums = true;
   }
   BlockContents block;
+  uint64_t start_micros = Env::Default()->NowMicros();
   if (!ReadBlock(rep_->file, opt, filter_handle, &block).ok()) {
     return;
   }
   if (block.heap_allocated) {
     rep_->filter_data = block.data.data();     // Will need to delete later
+    ++addFilterCount;
+    addFilterTime += Env::Default()->NowMicros() - start_micros;
+    filterNum++;
+    rep_->filter_size = block.data.size();
+    filterMemSpace += rep_->filter_size;
   }
   rep_->filter = new FilterBlockReader(rep_->options.filter_policy, block.data);
 }
