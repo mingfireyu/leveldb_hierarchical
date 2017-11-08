@@ -58,7 +58,6 @@ class Table {
  private:
   struct Rep;
   Rep* rep_;
-
   explicit Table(Rep* rep) { rep_ = rep; }
   static Iterator* BlockReader(void*, const ReadOptions&, const Slice&);
 

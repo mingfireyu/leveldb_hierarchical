@@ -44,6 +44,12 @@ unsigned long long compactionCount;   //BackGroud compaction
 unsigned long long trivialMoveCount;
 unsigned long long bloomFilterCompareCount;
 unsigned long long readTableCount;
+unsigned long long createFilterCount;
+unsigned long long createFilterTime;
+unsigned long long addFilterCount;
+unsigned long long addFilterTime;
+unsigned long long filterMemSpace;
+unsigned long long filterNum;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -115,7 +121,7 @@ Options SanitizeOptions(const std::string& dbname,
   Options result = src;
   result.comparator = icmp;
   result.filter_policy = (src.filter_policy != NULL) ? ipolicy : NULL;
-  ClipToRange(&result.max_open_files,    64 + kNumNonTableCacheFiles, 50000);
+  ClipToRange(&result.max_open_files,    64 + kNumNonTableCacheFiles, 60000);
   ClipToRange(&result.write_buffer_size, 64<<10,                      1<<30);
   ClipToRange(&result.max_file_size,     1<<20,                       1<<30);
   ClipToRange(&result.block_size,        1<<10,                       4<<20);
@@ -161,6 +167,9 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   trivialMoveCount = 0;
   bloomFilterCompareCount = 0;
   readTableCount = 0;
+  createFilterCount = createFilterTime =  0;
+  addFilterCount = addFilterTime = 0;
+  filterMemSpace = filterNum = 0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -1548,29 +1557,17 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
-   /* snprintf(buf, sizeof(buf),
-             "                               Compactions\n"
-             "Level  Files Size(B) \n"
-             "--------------------------------------------------\n"
-             );
-    value->append(buf);
-    for(int level = 0 ; level < config::kNumLevels ; level++){
-       int files = versions_->NumLevelFiles(level);
-      if (stats_[level].micros > 0 || files > 0) {
-        snprintf(
-            buf, sizeof(buf),
-            "%3d %8d %lld",
-            level,
-            files,
-            (unsigned long long)versions_->NumLevelBytes(level) );
-        value->append(buf);
-      }
-    }
-    */
+  
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
     snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu readTableCount:%llu \n",bloomFilterCompareCount,readTableCount);
     value->append(buf);
+     snprintf(buf,sizeof(buf),"\n createFilter Count: %llu Average Create Filter Time:%.3lf \n"    
+						   " AddFilter Count: %llu Average add filter time: %.3lf \n"
+						   " Filter Num: %llu Filter Mem space(B): %llu \n",
+					    createFilterCount,createFilterTime*1.0/createFilterCount,addFilterCount,addFilterTime*1.0/addFilterCount,filterNum,filterMemSpace);
+     value->append(buf);
+     
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();
