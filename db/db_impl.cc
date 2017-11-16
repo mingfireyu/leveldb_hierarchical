@@ -1711,9 +1711,9 @@ Status DB::Open(const Options& options, const std::string& dbname,
   impl->mutex_.Unlock();
   if (s.ok()) {
     assert(impl->mem_ != NULL);
-    impl->mutex_.Lock();
-    impl->versions_->findAllTable();
-    impl->mutex_.Unlock();
+    // impl->mutex_.Lock();
+    // impl->versions_->findAllTable();
+    // impl->mutex_.Unlock();
     *dbptr = impl;
   } else {
     delete impl;
