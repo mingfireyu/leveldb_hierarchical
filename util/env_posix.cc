@@ -157,6 +157,12 @@ class PosixRandomAccessFile: public RandomAccessFile {
 	//printf("read_size:%ld , aligned_offset:%ld , buf capacity:%ld \n",read_size,aligned_offset,abuf_->capacity_);
 	r = pread(fd_, abuf_->bufstart_, read_size, static_cast<off_t>(aligned_offset));
 	abuf_->Read(scratch,offset_advance,n);
+	if (r < 0) {
+	    // An error: return a non-ok status
+	    s = IOError(filename_, errno);
+	}else{
+	    r = n;
+	}
     }else{
       if(firstflag){
 	fprintf(stderr,"buffered io!\n");
@@ -164,7 +170,7 @@ class PosixRandomAccessFile: public RandomAccessFile {
       }
 	r = pread(fd_, scratch, n, static_cast<off_t>(offset));
     }
-    *result = Slice(scratch, (r < 0) ? 0 : n);
+    *result = Slice(scratch, (r < 0) ? 0 : r);
     if (r < 0) {
       // An error: return a non-ok status
       s = IOError(filename_, errno);

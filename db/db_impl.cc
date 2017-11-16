@@ -12,7 +12,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
-#include <boost/iterator/iterator_concepts.hpp>
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
@@ -136,7 +135,7 @@ Options SanitizeOptions(const std::string& dbname,
     }
   }
   if (result.block_cache == NULL) {
-    result.block_cache = NewLRUCache(8 << 20);
+    //result.block_cache = NewLRUCache(8 << 20);
   }
   return result;
 }
@@ -225,16 +224,20 @@ DBImpl::~DBImpl() {
   
   printf("\n---------------------READ STATISTICS-----------------------------------------\n");
   printf("type   \t\tcount\t\tmin\t\tave\t\tmax\n");
+  uint64_t access_time=0,access_count = 0;
   for(unsigned int i = 0 ; i < READMAXTIME+MEM_LENGTH ; i++){
     if(readSums[i].count){
       if(i == MEM_READ || i == IMEM_READ){
 	printf("%4s\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",readMemString[i],readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
       }else{
 	printf("%u time\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",i-IMEM_READ-1,readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
+	access_count += readSums[i].count*(i - IMEM_READ - 1);
+	access_time += readSums[i].ave;
       }
     }
   }
   printf("\n");
+  printf("access count:%lu access time: %lu \n",access_count,access_time);
   if (owns_info_log_) {
     delete options_.info_log;
   }
