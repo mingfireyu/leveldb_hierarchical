@@ -49,6 +49,8 @@ unsigned long long addFilterCount;
 unsigned long long addFilterTime;
 unsigned long long filterMemSpace;
 unsigned long long filterNum;
+unsigned long long block_read_time;
+unsigned long long block_read_count;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -169,6 +171,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   createFilterCount = createFilterTime =  0;
   addFilterCount = addFilterTime = 0;
   filterMemSpace = filterNum = 0;
+  block_read_time = block_read_count =  0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -1565,12 +1568,15 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     value->append(buf);
     snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu readTableCount:%llu \n",bloomFilterCompareCount,readTableCount);
     value->append(buf);
-     snprintf(buf,sizeof(buf),"\n createFilter Count: %llu Average Create Filter Time:%.3lf \n"    
+    snprintf(buf,sizeof(buf),"\n createFilter Count: %llu Average Create Filter Time:%.3lf \n"    
 						   " AddFilter Count: %llu Average add filter time: %.3lf \n"
 						   " Filter Num: %llu Filter Mem space(B): %llu \n",
 					    createFilterCount,createFilterTime*1.0/createFilterCount,addFilterCount,addFilterTime*1.0/addFilterCount,filterNum,filterMemSpace);
-     value->append(buf);
-     
+    value->append(buf);
+    snprintf(buf,sizeof(buf),"\n block average read time: %.3lf block read count: %llu \n",block_read_time*1.0/block_read_count,block_read_count);
+    value->append(buf);
+
+
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();

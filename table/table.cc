@@ -20,6 +20,8 @@ extern unsigned long long addFilterCount;
 extern unsigned long long addFilterTime;
 extern unsigned long long filterMemSpace;
 extern unsigned long long filterNum;
+extern unsigned long long block_read_time;
+extern unsigned long long block_read_count;
 namespace leveldb {
 
 struct Table::Rep {
@@ -256,11 +258,14 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k,
       // Not found
       bloomFilterCompareCount++;
     } else {
+      uint64_t start_micros = Env::Default()->NowMicros();
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
       if (block_iter->Valid()) {
         (*saver)(arg, block_iter->key(), block_iter->value());
       }
+      block_read_time += (Env::Default()->NowMicros() -  start_micros);
+      ++block_read_count;
       s = block_iter->status();
       options.readFilenum++;
       delete block_iter;
