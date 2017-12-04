@@ -19,6 +19,8 @@ extern unsigned long long bloomFilterCompareCount;
 extern unsigned long long readTableCount;
 extern unsigned long long filterMemSpace;
 extern unsigned long long filterNum;
+extern unsigned long long block_read_time;
+extern unsigned long long block_read_count;
 namespace leveldb {
 
 struct Table::Rep {
@@ -256,6 +258,7 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k,
       // Not found
       	MeasureTime(Statistics::GetStatistics().get(),Tickers::FILTER_MATCHES_TIME,Env::Default()->NowMicros() - start_micros);
     } else {
+      uint64_t start_micros = Env::Default()->NowMicros();
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
       if (block_iter->Valid()) {

@@ -49,6 +49,8 @@ unsigned long long addFilterCount;
 unsigned long long addFilterTime;
 unsigned long long filterMemSpace;
 unsigned long long filterNum;
+unsigned long long block_read_time;
+unsigned long long block_read_count;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -170,6 +172,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   createFilterCount = createFilterTime =  0;
   addFilterCount = addFilterTime = 0;
   filterMemSpace = filterNum = 0;
+  block_read_time = block_read_count =  0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -1575,7 +1578,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
      }
     int i = Tickers::ADD_FILTER_TIME;
     if(statis_->getTickerCount(Tickers::ADD_FILTER_TIME) != 0 ){
-	    snprintf(buf,sizeof(buf),"add filter from  %d filter(s) count: %lu time: %lu  average time: %.3lf\n", i - Tickers::ADD_FILTER_TIME,
+	    snprintf(buf,sizeof(buf),"add filter  filter count: %lu time: %lu  average time: %.3lf\n",
 			statis_->getTickerCount(i),
 			statis_->GetTickerHistogram(i),
 			statis_->GetTickerHistogram(i)*1.0/statis_->getTickerCount(i));
@@ -1587,7 +1590,6 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     value->append(buf);
     value->append(statis_->ToString(Tickers::FINDTABLE,Tickers::BLOCKREADER_NOCACHE_TIME));
     value->append(printStatistics());
-     
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();
