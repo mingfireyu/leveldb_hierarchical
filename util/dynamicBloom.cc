@@ -15,10 +15,10 @@ namespace {
 static uint32_t BloomHash(const Slice& key) {
   return Hash(key.data(), key.size(), 0xbc9f1d34);
 }
-static size_t bits[] = {31,30,27,28,18,1,1};
+static double bits[] = {31,30,27,28,18,1,1};
 class BloomFilterPolicy : public FilterPolicy {
  private:
-  size_t bits_per_key_[config::kNumLevels];
+  double bits_per_key_[config::kNumLevels];
   size_t k_[config::kNumLevels];
   
  public:
@@ -26,8 +26,8 @@ class BloomFilterPolicy : public FilterPolicy {
     // We intentionally round down to reduce probing cost a little bit
     FILE *fp = fopen(filename,"r");
     unsigned int j = 0 ;
-    while(fscanf(fp,"%lu",&bits[j++])!=EOF);
-    while( j < 7){
+    while(fscanf(fp,"%lf",&bits[j++])!=EOF);
+    while( j < config::kNumLevels){
  	bits[j++] = 1;
      }
     for(unsigned int i = 0 ; i < config::kNumLevels ; i++){
@@ -39,7 +39,7 @@ class BloomFilterPolicy : public FilterPolicy {
     }
     printf("\n");
     for(unsigned int i = 0 ; i < config::kNumLevels ; i++){
- 	 printf("%d:%lu ",i,bits_per_key_[i]);
+ 	 printf("%d:%lf ",i,bits_per_key_[i]);
      }
      printf("\n");
   }
@@ -51,12 +51,15 @@ class BloomFilterPolicy : public FilterPolicy {
   virtual void CreateFilter(const Slice* keys, int n, std::string* dst,int level) const {
     // Compute bloom filter size (in both bits and bytes)
     size_t bits = n * bits_per_key_[level];
-    if(level >= 7){
-      printf("level%d:%lu ",level,bits_per_key_[level]);
+    if(level > config::kNumLevels){
+      printf("level%d:%lf ",level,bits_per_key_[level]);
     }
     // For small n, we can see a very high false positive rate.  Fix it
     // by enforcing a minimum bloom filter length.
-    if (bits < 64) bits = 64;
+    if (bits < 64){
+	perror("enforcing a minimu bloom filter length");
+	bits = 64;
+    }
 
     size_t bytes = (bits + 7) / 8;
     bits = bytes * 8;

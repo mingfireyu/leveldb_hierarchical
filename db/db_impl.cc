@@ -34,7 +34,7 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
-
+#include "util/stop_watch.h"
 unsigned long long totalBytesWrite;
 unsigned long long totalWriteCount;
 unsigned long long immetableWrites;
@@ -149,6 +149,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       owns_info_log_(options_.info_log != raw_options.info_log),
       owns_cache_(options_.block_cache != raw_options.block_cache),
       dbname_(dbname),
+      statis_(options_.stats_.get()),
       db_lock_(NULL),
       shutting_down_(NULL),
       bg_cv_(&mutex_),
@@ -1229,7 +1230,9 @@ Status DBImpl::Get(const ReadOptions& options,
 
   bool have_stat_update = false;
   Version::GetStats stats;
-  gettimeofday(&start_time,NULL);
+  std::allocator<StopWatch> alloc_stop_watch;
+  auto p = alloc_stop_watch.allocate(1);
+  alloc_stop_watch.construct(p,env_,statis_,MEM_READ_TIME);
   // Unlock while reading from files and memtables
   {
     mutex_.Unlock();
@@ -1237,14 +1240,18 @@ Status DBImpl::Get(const ReadOptions& options,
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
       // Done
-      readMemTimeProcess(start_time,0);
+      alloc_stop_watch.destroy(p);
     } else if (imm != NULL && imm->Get(lkey, value, &s)) {
       // Done
-      readMemTimeProcess(start_time,1);
+      p->setHistType(IMMEM_READ_TIME);
+      alloc_stop_watch.destroy(p);
     } else {
       s = current->Get(options, lkey, value, &stats);
+      p->setHistType(options.read_file_nums+READ_0_TIME);
       have_stat_update = true;
+      alloc_stop_watch.destroy(p);
     }
+    alloc_stop_watch.deallocate(p,1);
     mutex_.Lock();
   }
 
@@ -1560,16 +1567,26 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
-  
+     if(statis_->getTickerCount(Tickers::CREATE_FILTER_TIME) != 0){
+		snprintf(buf,sizeof(buf),"average create filters time  = %.3lf count: %lu",
+			statis_->GetTickerHistogram(Tickers::CREATE_FILTER_TIME)*1.0/statis_->getTickerCount(Tickers::CREATE_FILTER_TIME),
+			statis_->getTickerCount(Tickers::CREATE_FILTER_TIME));
+		value->append(buf);  
+     }
+    int i = Tickers::ADD_FILTER_TIME;
+    if(statis_->getTickerCount(Tickers::ADD_FILTER_TIME) != 0 ){
+	    snprintf(buf,sizeof(buf),"add filter from  %d filter(s) count: %lu time: %lu  average time: %.3lf\n", i - Tickers::ADD_FILTER_TIME,
+			statis_->getTickerCount(i),
+			statis_->GetTickerHistogram(i),
+			statis_->GetTickerHistogram(i)*1.0/statis_->getTickerCount(i));
+		    value->append(buf);
+    }
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
-    snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu readTableCount:%llu \n",bloomFilterCompareCount,readTableCount);
+    snprintf(buf,sizeof(buf),"filter mem space overhead:%llu filter_num:%llu \n",filterMemSpace,filterNum);
     value->append(buf);
-     snprintf(buf,sizeof(buf),"\n createFilter Count: %llu Average Create Filter Time:%.3lf \n"    
-						   " AddFilter Count: %llu Average add filter time: %.3lf \n"
-						   " Filter Num: %llu Filter Mem space(B): %llu \n",
-					    createFilterCount,createFilterTime*1.0/createFilterCount,addFilterCount,addFilterTime*1.0/addFilterCount,filterNum,filterMemSpace);
-     value->append(buf);
+    value->append(statis_->ToString(Tickers::FINDTABLE,Tickers::BLOCKREADER_NOCACHE_TIME));
+    value->append(printStatistics());
      
     return true;
   } else if (in == "sstables") {
@@ -1654,7 +1671,15 @@ void DBImpl::untilCompactionEnds()
 	stat_str.append("\n--------------above are untilCompactionEnds output--------------\n");
 	std::cout<<stat_str<<std::endl;
 }
-   
+
+std::string DBImpl::printStatistics()
+{
+    if(statis_){
+	    return statis_->ToString();
+    }
+    return std::string();
+}
+
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {

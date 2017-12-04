@@ -177,7 +177,54 @@ class PosixRandomAccessFile: public RandomAccessFile {
     }
     return s;
   }
+   virtual Status Reads(uint64_t offset, size_t n, Slice  results[],
+                      char* scratchs[],size_t lens[],int num) const {
+    Status s;
+    ssize_t r;
+    static bool firstflag = true;
+    if(leveldb::direct_IO_flag_){
+      if(firstflag){
+	fprintf(stderr,"directIO!\n");
+	firstflag = false;
+      }
+	size_t alignment = abuf_->alignment_;
+	size_t aligned_offset = TruncateToPageBoundary(alignment, offset);
+	size_t offset_advance = offset - aligned_offset;
+	size_t read_size = Roundup(offset + n, alignment) - aligned_offset;
+	if(read_size > abuf_->capacity_){
+	    abuf_->AllocateNewBuffer(read_size);
+	}
+	//printf("read_size:%ld , aligned_offset:%ld , buf capacity:%ld \n",read_size,aligned_offset,abuf_->capacity_);
+	r = pread(fd_, abuf_->bufstart_, read_size, static_cast<off_t>(aligned_offset));
+	if (r < 0) {
+	    // An error: return a non-ok status
+	    s = IOError(filename_, errno);
+	}else{
+	    for(int i = 0 ; i < num ; i++){
+		abuf_->Read(scratchs[i],offset_advance,lens[i]);
+		offset_advance += lens[i];
+		results[i] = Slice(scratchs[i],lens[i]);
+	    }
+	}
+    }else{
+      if(firstflag){
+	fprintf(stderr,"buffered io!\n");
+	firstflag = false;
+      }
+      for(int i = 0 ; i < num ; ++i){
+	    r = pread(fd_, scratchs[i], lens[i], static_cast<off_t>(offset));
+	    offset += lens[i];
+	    results[i] = Slice(scratchs[i], (r < 0) ? 0 : r);
+	    if (r < 0) {
+		// An error: return a non-ok status
+		s = IOError(filename_, errno);
+	    }
+      }
+    }
+    return s;
+  }
 };
+
 
 // Helper class to limit mmap file usage so that we do not end up
 // running out virtual memory or running into kernel performance

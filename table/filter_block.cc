@@ -9,8 +9,7 @@
 #include <db/dbformat.h>
 #include<cstdio>
 #include "leveldb/env.h"
-extern unsigned long long createFilterCount;
-extern unsigned long long createFilterTime;
+#include "leveldb/statistics.h"
 namespace leveldb {
 
 // See doc/table_format.txt for an explanation of the filter block format.
@@ -74,8 +73,7 @@ void FilterBlockBuilder::GenerateFilter() {
   filter_offsets_.push_back(result_.size());
   uint64_t start_micros = Env::Default()->NowMicros();
   policy_->CreateFilter(&tmp_keys_[0], static_cast<int>(num_keys), &result_,level_);
-  ++createFilterCount;
-  createFilterTime += (Env::Default()->NowMicros() - start_micros); 
+  MeasureTime(Statistics::GetStatistics().get(),Tickers::CREATE_FILTER_TIME,Env::Default()->NowMicros() - start_micros);
   tmp_keys_.clear();
   keys_.clear();
   start_.clear();
