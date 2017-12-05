@@ -1571,7 +1571,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
       }
     }
      if(statis_->getTickerCount(Tickers::CREATE_FILTER_TIME) != 0){
-		snprintf(buf,sizeof(buf),"average create filters time  = %.3lf count: %lu",
+		snprintf(buf,sizeof(buf),"average create filters time  = %.3lf count: %lu\n",
 			statis_->GetTickerHistogram(Tickers::CREATE_FILTER_TIME)*1.0/statis_->getTickerCount(Tickers::CREATE_FILTER_TIME),
 			statis_->getTickerCount(Tickers::CREATE_FILTER_TIME));
 		value->append(buf);  

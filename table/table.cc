@@ -151,6 +151,7 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
     MeasureTime(Statistics::GetStatistics().get(),Tickers::ADD_FILTER_TIME,Env::Default()->NowMicros() - start_micros);
     rep_->filter_size = block.data.size();
     filterMemSpace += rep_->filter_size;
+    ++filterNum;
   }
   rep_->filter = new FilterBlockReader(rep_->options.filter_policy, block.data);
 }
