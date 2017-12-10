@@ -1669,15 +1669,17 @@ void DBImpl::untilCompactionEnds()
   	    fprintf(stderr,"no compaction!\n");
          }
 	std::string stat_str;
-	this->GetProperty("leveldb.stats",&stat_str);
+       	this->GetProperty("leveldb.stats",&stat_str);
 	stat_str.append("\n--------------above are untilCompactionEnds output--------------\n");
-	std::cout<<stat_str<<std::endl;
+	std::cerr<<stat_str<<std::endl;
 }
 
 std::string DBImpl::printStatistics()
-{
+{    
     if(statis_){
-	    return statis_->ToString();
+      std::string temp_str = statis_->ToString();
+      statis_->reset();
+      return temp_str;
     }
     return std::string();
 }
