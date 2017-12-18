@@ -46,6 +46,9 @@ unsigned long long bloomFilterCompareCount;
 unsigned long long readTableCount;
 unsigned long long filterMemSpace;
 unsigned long long filterNum;
+unsigned long long notFoundDiskAccessCount;
+unsigned long long foundDiskAccessCount;
+
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -164,6 +167,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   trivialMoveCount = 0;
   bloomFilterCompareCount = 0;
   readTableCount = 0;
+  notFoundDiskAccessCount = 0;
+  foundDiskAccessCount = 0;
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -1578,6 +1583,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
     value->append(buf);
     value->append(statis_->ToString(Tickers::FINDTABLE,Tickers::BLOCKREADER_NOCACHE_TIME));
     value->append(printStatistics());
+
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();
