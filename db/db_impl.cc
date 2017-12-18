@@ -12,7 +12,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <vector>
-#include <boost/iterator/iterator_concepts.hpp>
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
@@ -35,7 +34,7 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
-
+#include "util/stop_watch.h"
 unsigned long long totalBytesWrite;
 unsigned long long totalWriteCount;
 unsigned long long immetableWrites;
@@ -46,6 +45,14 @@ unsigned long long bloomFilterCompareCount;
 unsigned long long readTableCount;
 unsigned long long foundDiskAccessCount;
 unsigned long long notFoundDiskAccessCount;
+unsigned long long createFilterCount;
+unsigned long long createFilterTime;
+unsigned long long addFilterCount;
+unsigned long long addFilterTime;
+unsigned long long filterMemSpace;
+unsigned long long filterNum;
+unsigned long long block_read_time;
+unsigned long long block_read_count;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -117,7 +124,7 @@ Options SanitizeOptions(const std::string& dbname,
   Options result = src;
   result.comparator = icmp;
   result.filter_policy = (src.filter_policy != NULL) ? ipolicy : NULL;
-  ClipToRange(&result.max_open_files,    64 + kNumNonTableCacheFiles, 50000);
+  ClipToRange(&result.max_open_files,    64 + kNumNonTableCacheFiles, 60000);
   ClipToRange(&result.write_buffer_size, 64<<10,                      1<<30);
   ClipToRange(&result.max_file_size,     1<<20,                       1<<30);
   ClipToRange(&result.block_size,        1<<10,                       4<<20);
@@ -132,7 +139,7 @@ Options SanitizeOptions(const std::string& dbname,
     }
   }
   if (result.block_cache == NULL) {
-    result.block_cache = NewLRUCache(8 << 20);
+    //result.block_cache = NewLRUCache(8 << 20);
   }
   return result;
 }
@@ -146,6 +153,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       owns_info_log_(options_.info_log != raw_options.info_log),
       owns_cache_(options_.block_cache != raw_options.block_cache),
       dbname_(dbname),
+      statis_(options_.stats_.get()),
       db_lock_(NULL),
       shutting_down_(NULL),
       bg_cv_(&mutex_),
@@ -165,6 +173,11 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   readTableCount = 0;
   foundDiskAccessCount = 0;
   notFoundDiskAccessCount = 0;
+  createFilterCount = createFilterTime =  0;
+  addFilterCount = addFilterTime = 0;
+  filterMemSpace = filterNum = 0;
+  block_read_time = block_read_count =  0;
+
   for(unsigned int i = 0 ; i < TIME_LENGTH ;i++){
     timeSums[i] = 0;
   }
@@ -220,16 +233,20 @@ DBImpl::~DBImpl() {
   
   printf("\n---------------------READ STATISTICS-----------------------------------------\n");
   printf("type   \t\tcount\t\tmin\t\tave\t\tmax\n");
+  uint64_t access_time=0,access_count = 0;
   for(unsigned int i = 0 ; i < READMAXTIME+MEM_LENGTH ; i++){
     if(readSums[i].count){
       if(i == MEM_READ || i == IMEM_READ){
 	printf("%4s\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",readMemString[i],readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
       }else{
 	printf("%u time\t\t%llu\t\t%llu\t\t%.2lf\t\t%llu\n",i-IMEM_READ-1,readSums[i].count,readSums[i].min,readSums[i].ave*1.0/readSums[i].count,readSums[i].max);
+	access_count += readSums[i].count*(i - IMEM_READ - 1);
+	access_time += readSums[i].ave;
       }
     }
   }
   printf("\n");
+  printf("access count:%lu access time: %lu \n",access_count,access_time);
   if (owns_info_log_) {
     delete options_.info_log;
   }
@@ -1221,7 +1238,9 @@ Status DBImpl::Get(const ReadOptions& options,
 
   bool have_stat_update = false;
   Version::GetStats stats;
-  gettimeofday(&start_time,NULL);
+  std::allocator<StopWatch> alloc_stop_watch;
+  auto p = alloc_stop_watch.allocate(1);
+  alloc_stop_watch.construct(p,env_,statis_,MEM_READ_TIME);
   // Unlock while reading from files and memtables
   {
     mutex_.Unlock();
@@ -1229,14 +1248,18 @@ Status DBImpl::Get(const ReadOptions& options,
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
       // Done
-      readMemTimeProcess(start_time,0);
+      alloc_stop_watch.destroy(p);
     } else if (imm != NULL && imm->Get(lkey, value, &s)) {
       // Done
-      readMemTimeProcess(start_time,1);
+      p->setHistType(IMMEM_READ_TIME);
+      alloc_stop_watch.destroy(p);
     } else {
       s = current->Get(options, lkey, value, &stats);
+      p->setHistType(options.read_file_nums+READ_0_TIME);
       have_stat_update = true;
+      alloc_stop_watch.destroy(p);
     }
+    alloc_stop_watch.deallocate(p,1);
     mutex_.Lock();
   }
 
@@ -1552,31 +1575,31 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
-   /* snprintf(buf, sizeof(buf),
-             "                               Compactions\n"
-             "Level  Files Size(B) \n"
-             "--------------------------------------------------\n"
-             );
-    value->append(buf);
-    for(int level = 0 ; level < config::kNumLevels ; level++){
-       int files = versions_->NumLevelFiles(level);
-      if (stats_[level].micros > 0 || files > 0) {
-        snprintf(
-            buf, sizeof(buf),
-            "%3d %8d %lld",
-            level,
-            files,
-            (unsigned long long)versions_->NumLevelBytes(level) );
-        value->append(buf);
-      }
+     if(statis_->getTickerCount(Tickers::CREATE_FILTER_TIME) != 0){
+		snprintf(buf,sizeof(buf),"average create filters time  = %.3lf count: %lu\n",
+			statis_->GetTickerHistogram(Tickers::CREATE_FILTER_TIME)*1.0/statis_->getTickerCount(Tickers::CREATE_FILTER_TIME),
+			statis_->getTickerCount(Tickers::CREATE_FILTER_TIME));
+		value->append(buf);  
+     }
+    int i = Tickers::ADD_FILTER_TIME;
+    if(statis_->getTickerCount(Tickers::ADD_FILTER_TIME) != 0 ){
+	    snprintf(buf,sizeof(buf),"add filter  filter count: %lu time: %lu  average time: %.3lf\n",
+			statis_->getTickerCount(i),
+			statis_->GetTickerHistogram(i),
+			statis_->GetTickerHistogram(i)*1.0/statis_->getTickerCount(i));
+		    value->append(buf);
     }
-    */
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
-    snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu readTableCount:%llu \n",bloomFilterCompareCount,readTableCount);
+    snprintf(buf,sizeof(buf),"filter mem space overhead:%llu filter_num:%llu \n",filterMemSpace,filterNum);
     value->append(buf);
+
     snprintf(buf,sizeof(buf),"\n found Count:%llu not Found Count:%llu \n",foundDiskAccessCount,notFoundDiskAccessCount);
     value->append(buf);
+
+    value->append(statis_->ToString(Tickers::FINDTABLE,Tickers::BLOCKREADER_NOCACHE_TIME));
+    value->append(printStatistics());
+
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();
@@ -1636,7 +1659,11 @@ void DBImpl::untilCompactionEnds()
 {
         std::string preValue,afterValue;
         int count = 0;
+
+
+
         const int countMAX = 2400;
+
 	this->GetProperty("leveldb.num-files",&afterValue);
      // std::cout<<afterValue<<std::endl;
         //std::cout<<preValue<<std::endl;
@@ -1652,11 +1679,21 @@ void DBImpl::untilCompactionEnds()
   	    fprintf(stderr,"no compaction!\n");
          }
 	std::string stat_str;
-	this->GetProperty("leveldb.stats",&stat_str);
+       	this->GetProperty("leveldb.stats",&stat_str);
 	stat_str.append("\n--------------above are untilCompactionEnds output--------------\n");
-	std::cout<<stat_str<<std::endl;
+	std::cerr<<stat_str<<std::endl;
 }
-   
+
+std::string DBImpl::printStatistics()
+{    
+    if(statis_){
+      std::string temp_str = statis_->ToString();
+      statis_->reset();
+      return temp_str;
+    }
+    return std::string();
+}
+
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
@@ -1716,9 +1753,9 @@ Status DB::Open(const Options& options, const std::string& dbname,
   impl->mutex_.Unlock();
   if (s.ok()) {
     assert(impl->mem_ != NULL);
-    impl->mutex_.Lock();
-    impl->versions_->findAllTable();
-    impl->mutex_.Unlock();
+    // impl->mutex_.Lock();
+    // impl->versions_->findAllTable();
+    // impl->mutex_.Unlock();
     *dbptr = impl;
   } else {
     delete impl;
