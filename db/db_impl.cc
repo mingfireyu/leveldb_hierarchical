@@ -35,7 +35,7 @@
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
-
+#include "util/stop_watch.h"
 unsigned long long totalBytesWrite;
 unsigned long long totalWriteCount;
 unsigned long long immetableWrites;
@@ -44,6 +44,8 @@ unsigned long long compactionCount;   //BackGroud compaction
 unsigned long long trivialMoveCount;
 unsigned long long bloomFilterCompareCount;
 unsigned long long readTableCount;
+unsigned long long filterMemSpace;
+unsigned long long filterNum;
 STATISTICSITEM readSums[READMAXTIME+MEM_LENGTH];
 static const char readMemString[][50]={"MEM","IMEM"};
 enum TIME_STATISTICS{
@@ -144,6 +146,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       owns_info_log_(options_.info_log != raw_options.info_log),
       owns_cache_(options_.block_cache != raw_options.block_cache),
       dbname_(dbname),
+      statis_(options_.stats_.get()),
       db_lock_(NULL),
       shutting_down_(NULL),
       bg_cv_(&mutex_),
@@ -1217,6 +1220,9 @@ Status DBImpl::Get(const ReadOptions& options,
 
   bool have_stat_update = false;
   Version::GetStats stats;
+  std::allocator<StopWatch> alloc_stop_watch;
+  auto p = alloc_stop_watch.allocate(1);
+  alloc_stop_watch.construct(p,env_,statis_,MEM_READ_TIME);
   gettimeofday(&start_time,NULL);
   // Unlock while reading from files and memtables
   {
@@ -1225,14 +1231,18 @@ Status DBImpl::Get(const ReadOptions& options,
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
       // Done
-      readMemTimeProcess(start_time,0);
+      alloc_stop_watch.destroy(p);
     } else if (imm != NULL && imm->Get(lkey, value, &s)) {
       // Done
-      readMemTimeProcess(start_time,1);
+       p->setHistType(IMMEM_READ_TIME);
+       alloc_stop_watch.destroy(p);
     } else {
       s = current->Get(options, lkey, value, &stats);
+      p->setHistType(options.read_file_nums+READ_0_TIME);
       have_stat_update = true;
+      alloc_stop_watch.destroy(p);
     }
+    alloc_stop_watch.deallocate(p,1);
     mutex_.Lock();
   }
 
@@ -1548,29 +1558,26 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
         value->append(buf);
       }
     }
-   /* snprintf(buf, sizeof(buf),
-             "                               Compactions\n"
-             "Level  Files Size(B) \n"
-             "--------------------------------------------------\n"
-             );
-    value->append(buf);
-    for(int level = 0 ; level < config::kNumLevels ; level++){
-       int files = versions_->NumLevelFiles(level);
-      if (stats_[level].micros > 0 || files > 0) {
-        snprintf(
-            buf, sizeof(buf),
-            "%3d %8d %lld",
-            level,
-            files,
-            (unsigned long long)versions_->NumLevelBytes(level) );
-        value->append(buf);
-      }
+   if(statis_->getTickerCount(Tickers::CREATE_FILTER_TIME) != 0){
+ 		snprintf(buf,sizeof(buf),"average create filters time  = %.3lf count: %lu",
+ 			statis_->GetTickerHistogram(Tickers::CREATE_FILTER_TIME)*1.0/statis_->getTickerCount(Tickers::CREATE_FILTER_TIME),
+ 			statis_->getTickerCount(Tickers::CREATE_FILTER_TIME));
+ 		value->append(buf);  
     }
-    */
-    snprintf(buf,sizeof(buf),"\n bloomFilterCompare Count:%llu readTableCount:%llu \n",bloomFilterCompareCount,readTableCount);
+    int i = Tickers::ADD_FILTER_TIME;
+     if(statis_->getTickerCount(Tickers::ADD_FILTER_TIME) != 0 ){
+ 	   snprintf(buf,sizeof(buf),"add filter  filter count: %lu time: %lu  average time: %.3lf\n",
+ 			statis_->getTickerCount(i),
+ 			statis_->GetTickerHistogram(i),
+ 			statis_->GetTickerHistogram(i)*1.0/statis_->getTickerCount(i));
+ 		    value->append(buf);
+     }
+    snprintf(buf,sizeof(buf),"filter mem space overhead:%llu filter_num:%llu \n",filterMemSpace,filterNum);
     value->append(buf);
     snprintf(buf,sizeof(buf),"\n Compaction Count:%llu TrivialMoveCount:%llu \n",compactionCount,trivialMoveCount);
     value->append(buf);
+    value->append(statis_->ToString(Tickers::FINDTABLE,Tickers::BLOCKREADER_NOCACHE_TIME));
+    value->append(printStatistics());
     return true;
   } else if (in == "sstables") {
     *value = versions_->current()->DebugString();
@@ -1598,6 +1605,16 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
   }
 
   return false;
+}
+
+std::string DBImpl::printStatistics()
+ {
+     if(statis_){
+	  std::string temp_str = statis_->ToString();
+	  statis_->reset();
+ 	  return temp_str;
+   }
+    return std::string();
 }
 
 void DBImpl::GetApproximateSizes(

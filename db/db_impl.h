@@ -14,7 +14,7 @@
 #include "leveldb/env.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
-
+#include "leveldb/statistics.h"
 namespace leveldb {
 
 class MemTable;
@@ -64,6 +64,7 @@ class DBImpl : public DB {
   // bytes.
   void RecordReadSample(Slice key);
   void untilCompactionEnds();
+  std::string printStatistics();
  private:
   friend class DB;
   struct CompactionState;
@@ -126,7 +127,7 @@ class DBImpl : public DB {
   bool owns_info_log_;
   bool owns_cache_;
   const std::string dbname_;
-
+  Statistics *statis_;
   // table_cache_ provides its own synchronization
   TableCache* table_cache_;
 

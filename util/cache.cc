@@ -332,7 +332,7 @@ void LRUCache::Prune() {
   }
 }
 
-static const int kNumShardBits = 4;
+static const int kNumShardBits = 0;
 static const int kNumShards = 1 << kNumShardBits;
 
 class ShardedLRUCache : public Cache {
@@ -346,6 +346,9 @@ class ShardedLRUCache : public Cache {
   }
 
   static uint32_t Shard(uint32_t hash) {
+    if(kNumShardBits == 0){
+	 return 0;
+    }
     return hash >> (32 - kNumShardBits);
   }
 

@@ -14,12 +14,17 @@
 #include "table/format.h"
 #include "table/two_level_iterator.h"
 #include "util/coding.h"
+#include "leveldb/statistics.h"
 extern unsigned long long bloomFilterCompareCount;
 extern unsigned long long readTableCount;
+extern unsigned long long filterMemSpace;
+extern unsigned long long filterNum;
 namespace leveldb {
 
 struct Table::Rep {
   ~Rep() {
+     filterNum--;
+     filterMemSpace -= filter_size;
     delete filter;
     delete [] filter_data;
     delete index_block;
@@ -34,6 +39,7 @@ struct Table::Rep {
 
   BlockHandle metaindex_handle;  // Handle to metaindex_block: saved from footer
   Block* index_block;
+  size_t filter_size;
 };
 
 Status Table::Open(const Options& options,
@@ -80,6 +86,7 @@ Status Table::Open(const Options& options,
     rep->cache_id = (options.block_cache ? options.block_cache->NewId() : 0);
     rep->filter_data = NULL;
     rep->filter = NULL;
+    rep->filter_size = 0;
     *table = new Table(rep);
     (*table)->ReadMeta(footer);
   } else {
@@ -132,11 +139,15 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
     opt.verify_checksums = true;
   }
   BlockContents block;
+  uint64_t start_micros = Env::Default()->NowMicros();
   if (!ReadBlock(rep_->file, opt, filter_handle, &block).ok()) {
     return;
   }
   if (block.heap_allocated) {
     rep_->filter_data = block.data.data();     // Will need to delete later
+    MeasureTime(Statistics::GetStatistics().get(),Tickers::ADD_FILTER_TIME,Env::Default()->NowMicros() - start_micros);
+     rep_->filter_size = block.data.size();
+     filterMemSpace += rep_->filter_size;
   }
   rep_->filter = new FilterBlockReader(rep_->options.filter_policy, block.data);
 }
@@ -174,8 +185,8 @@ Iterator* Table::BlockReader(void* arg,
   Slice input = index_value;
   Status s = handle.DecodeFrom(&input);
   // We intentionally allow extra stuff in index_value so that we
-  // can add more features in the future.
-
+  // can add more features in the future. 
+  uint64_t start_micros = Env::Default()->NowMicros();
   if (s.ok()) {
     BlockContents contents;
     if (block_cache != NULL) {
@@ -186,8 +197,11 @@ Iterator* Table::BlockReader(void* arg,
       cache_handle = block_cache->Lookup(key);
       if (cache_handle != NULL) {
         block = reinterpret_cast<Block*>(block_cache->Value(cache_handle));
+	MeasureTime(Statistics::GetStatistics().get(),Tickers::BLOCKREADER_CACHE_TIME,Env::Default()->NowMicros() - start_micros);
       } else {
         s = ReadBlock(table->rep_->file, options, handle, &contents);
+	MeasureTime(Statistics::GetStatistics().get(),Tickers::BLOCKREADER_NOCACHE_TIME,Env::Default()->NowMicros() - start_micros);
+
         if (s.ok()) {
           block = new Block(contents);
           if (contents.cachable && options.fill_cache) {
@@ -198,6 +212,8 @@ Iterator* Table::BlockReader(void* arg,
       }
     } else {
       s = ReadBlock(table->rep_->file, options, handle, &contents);
+     MeasureTime(Statistics::GetStatistics().get(),Tickers::BLOCKREADER_NOCACHE_TIME,Env::Default()->NowMicros() - start_micros);
+
       if (s.ok()) {
         block = new Block(contents);
       }
@@ -230,6 +246,7 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k,
   Status s;
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
   iiter->Seek(k);
+  uint64_t start_micros = Env::Default()->NowMicros();
   if (iiter->Valid()) {
     Slice handle_value = iiter->value();
     FilterBlockReader* filter = rep_->filter;
@@ -239,15 +256,16 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k,
         handle.DecodeFrom(&handle_value).ok() &&
         !filter->KeyMayMatch(handle.offset(), k)) {
       // Not found
-	bloomFilterCompareCount++;
+	MeasureTime(Statistics::GetStatistics().get(),Tickers::FILTER_MATCHES_TIME,Env::Default()->NowMicros() - start_micros);
     } else {
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
       if (block_iter->Valid()) {
         (*saver)(arg, block_iter->key(), block_iter->value());
       }
+      MeasureTime(Statistics::GetStatistics().get(),Tickers::BLOCK_READ_TIME,Env::Default()->NowMicros() - start_micros);
       s = block_iter->status();
-      options.readFilenum++;
+      options.read_file_nums++;
       delete block_iter;
     }
   }

@@ -25,7 +25,10 @@ Options::Options()
       compression(kSnappyCompression),
       reuse_logs(false),
       filter_policy(NULL),
-      log_open(true){
+      log_open(true),
+      size_ratio(10),
+      stats_(nullptr)
+      {
 }
 
 }  // namespace leveldb
