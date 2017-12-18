@@ -437,8 +437,6 @@ Status Version::Get(const ReadOptions& options,
         case kFound:
           return s;
         case kDeleted:
-          return s;
-        case kDeleted:
           s = Status::NotFound(Slice());  // Use empty error message for speed
           return s;
         case kCorrupt:
