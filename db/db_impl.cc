@@ -1635,7 +1635,11 @@ void DBImpl::untilCompactionEnds()
  {
       std::string preValue,afterValue;
       int count = 0;
+
+
+
       const int countMAX = 2400;
+
       this->GetProperty("leveldb.num-files",&afterValue);
    // std::cout<<afterValue<<std::endl;
       //std::cout<<preValue<<std::endl;
